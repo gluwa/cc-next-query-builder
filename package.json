@@ -1,0 +1,32 @@
+{
+  "name": "cc-next-query-builder",
+  "version": "0.0.1",
+  "description": "sample for ccnext abi encoding PoC",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "check-format": "prettier --check .",
+    "format": "prettier --write .",
+    "start": "node dist/index.js",
+    "exec": "tsc && node dist/index.js",
+    "test:smoke": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 jest --config tests/jest.config.ts tests/smoke/* --coverage=false"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.0.5",
+    "@types/node": "^22.0.2",
+    "@types/prompts": "^2.4.9",
+    "cross-env": "^10.0.0",
+    "jest": "^30.0.5",
+    "jest-mock-extended": "^4.0.0",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.5"
+  },
+  "author": "Gluwa Inc.",
+  "license": "MIT"
+}
