@@ -1,8 +1,9 @@
 {
-  "name": "cc-next-query-builder",
+  "name": "@gluwa/cc-next-query-builder",
   "version": "0.0.1",
   "description": "sample for ccnext abi encoding PoC",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "check-format": "prettier --check .",
