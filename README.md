@@ -1,5 +1,5 @@
 # cc-next-query-builder
-cc-next-query-builder is a SDK for JS/TS used for composing layout segments within a query to be submitted to the CCNext prover contract.
+cc-next-query-builder is a SDK for JS/TS used for composing layout segments within a query to be submitted to the USC testnet prover contract.
 
 # How to use?
 
@@ -36,7 +36,7 @@ builder.setAbiProvider(async (contractAddress: string) => {
 ```
 
 ## 4. Building the query
-Depending on what your USC on CCNext requires, you can configure your query builder to add fields from the transaction where the available fields are 
+Depending on what your Universal Smart Contract on USC testnet requires, you can configure your query builder to add fields from the transaction where the available fields are 
 ``` js
 export enum QueryableFields {
   Type = 'type',
