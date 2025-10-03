@@ -8,6 +8,7 @@ function getMappedFieldsForType0(): MappedEncodedFields {
       { name: QueryableFields.TxGasPrice, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -27,6 +28,7 @@ function getMappedFieldsForType1(): MappedEncodedFields {
       { name: QueryableFields.TxGasPrice, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -44,10 +46,12 @@ function getMappedFieldsForType2(): MappedEncodedFields {
       { name: QueryableFields.Type, type: 'uint8' },
       { name: QueryableFields.TxChainId, type: 'uint64' },
       { name: QueryableFields.TxNonce, type: 'uint64' },
+      { name: QueryableFields.TxMaxPriorityFeePerGasIsNull, type: 'bool' },
       { name: QueryableFields.TxMaxPriorityFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -63,16 +67,20 @@ function getMappedFieldsForType3(): MappedEncodedFields {
   return {
     fields: [
       { name: QueryableFields.Type, type: 'uint8' },
+      { name: QueryableFields.TxChainIdIsNull, type: 'bool' },
       { name: QueryableFields.TxChainId, type: 'uint64' },
       { name: QueryableFields.TxNonce, type: 'uint64' },
+      { name: QueryableFields.TxMaxPriorityFeePerGasIsNull, type: 'bool' },
       { name: QueryableFields.TxMaxPriorityFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
       { name: QueryableFields.TxAccessList, type: 'tuple(address,uint256[])[]' },
+      { name: QueryableFields.TxMaxFeePerBlobGasIsNull, type: 'bool' },
       { name: QueryableFields.TxMaxFeePerBlobGas, type: 'uint256' },
       { name: QueryableFields.TxBlobVersionedHashes, type: 'bytes32[]' },
       { name: QueryableFields.TxYParity, type: 'uint8' },
@@ -86,12 +94,15 @@ function getMappedFieldsForType4(): MappedEncodedFields {
   return {
     fields: [
       { name: QueryableFields.Type, type: 'uint8' },
+      { name: QueryableFields.TxChainIdIsNull, type: 'bool' },
       { name: QueryableFields.TxChainId, type: 'uint64' },
       { name: QueryableFields.TxNonce, type: 'uint64' },
+      { name: QueryableFields.TxMaxPriorityFeePerGasIsNull, type: 'bool' },
       { name: QueryableFields.TxMaxPriorityFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -104,7 +115,7 @@ function getMappedFieldsForType4(): MappedEncodedFields {
   };
 }
 
-export function getMappedFieldsForType(type: number): MappedEncodedFields {
+function getMappedFieldsForType(type: number): MappedEncodedFields {
   switch (type) {
     case 0:
       return getMappedFieldsForType0();
