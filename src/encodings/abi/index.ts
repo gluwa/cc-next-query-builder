@@ -6,18 +6,14 @@ export enum EncodingVersion {
   V1 = 1,
 }
 
-export function getReceiptFields(rx: TransactionReceipt): EncodedFields {
+function getReceiptFields(rx: TransactionReceipt): EncodedFields {
   return {
     types: ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
     values: [rx.status, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
   };
 }
 
-export function getAllFields(
-  tx: TransactionResponse,
-  rx: TransactionReceipt,
-  encoding: EncodingVersion,
-): EncodedFields {
+function getAllFields(tx: TransactionResponse, rx: TransactionReceipt, encoding: EncodingVersion): EncodedFields {
   let txFields = null;
   switch (encoding) {
     case EncodingVersion.V1:
