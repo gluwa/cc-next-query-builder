@@ -22,8 +22,10 @@ export function getAllFields(
   switch (encoding) {
     case EncodingVersion.V1:
       txFields = getFieldsForTypeV1(tx);
+      break;
     default:
       txFields = getFieldsForTypeV1(tx);
+      break;
   }
   const receiptFields = getReceiptFields(rx);
   const allFieldTypes = [...txFields.types, ...receiptFields.types];

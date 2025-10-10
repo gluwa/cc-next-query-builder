@@ -21,6 +21,7 @@ export function getAllFieldsForTransaction(type: number, encoding: EncodingVersi
       break;
     default:
       txFields = getMappedFieldsForTypeV1(type);
+      break;
   }
   const rxFields = getMappedReceiptFields();
   const allFields: MappedEncodedFields = {
