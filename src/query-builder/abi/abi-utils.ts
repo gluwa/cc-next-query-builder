@@ -1,9 +1,6 @@
-import { TransactionResponse, TransactionReceipt, ParamType, AbiCoder, BytesLike, hexlify, toNumber, N } from 'ethers';
-import { Reader } from 'ethers/lib.esm/abi/coders/abstract-coder';
-import { FieldMetadata, MappedEncodedFields, QueryableFields } from './models';
-import { abiEncode } from '../../encodings/abi';
+import { ParamType, BytesLike, hexlify, toNumber } from 'ethers';
+import { FieldMetadata } from './models';
 import { ForkedReader } from '../common/ForkedReader';
-import { getNumber } from 'ethers';
 import { isDynamic } from '../common/is-dynamic';
 
 const WORD_SIZE = 32;

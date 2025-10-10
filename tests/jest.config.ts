@@ -1,7 +1,7 @@
 import type { Config } from '@jest/types';
-import { resolve } from 'path';
+import path from 'path';
 
-const rootDir = resolve(__dirname, '..');
+const rootDir = path.resolve();
 
 const config: Config.InitialOptions = {
   preset: 'ts-jest',

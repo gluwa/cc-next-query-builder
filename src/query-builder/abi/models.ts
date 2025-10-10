@@ -14,6 +14,7 @@ export enum QueryableFields {
   TxS = 's',
   TxYParity = 'yParity',
   TxAccessList = 'accessList',
+  TxAuthorizationList = 'authorizationList',
   TxMaxPriorityFeePerGas = 'maxPriorityFeePerGas',
   TxMaxFeePerGas = 'maxFeePerGas',
   TxMaxFeePerBlobGas = 'maxFeePerBlobGas',

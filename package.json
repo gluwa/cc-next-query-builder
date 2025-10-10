@@ -1,6 +1,6 @@
 {
   "name": "@gluwa/cc-next-query-builder",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "sample for ccnext abi encoding PoC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "ethers": "^6.13.5"
+    "ethers": "^6.15.0"
   },
   "author": "Gluwa Inc.",
   "license": "MIT"
