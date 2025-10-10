@@ -36,18 +36,26 @@ export class QueryBuilder {
     this.computedOffsets = computedOffsets;
   }
 
-  static async createFromTransactionHash(rpc: JsonRpcProvider, transactionHash: string): Promise<QueryBuilder> {
+  static async createFromTransactionHash(
+    rpc: JsonRpcProvider,
+    transactionHash: string,
+    encoding: EncodingVersion = EncodingVersion.V1,
+  ): Promise<QueryBuilder> {
     const tx = await rpc.getTransaction(transactionHash);
     if (!tx) throw new Error(`could not find a transaction by hash ${transactionHash}`);
 
     const rx = await rpc.getTransactionReceipt(transactionHash);
     if (!rx) throw new Error(`could not find a receipt for the transaction hash ${transactionHash}`);
 
-    return new QueryBuilder(tx, rx);
+    return new QueryBuilder(tx, rx, encoding);
   }
 
-  static createFromTransaction(tx: TransactionResponse, rx: TransactionReceipt): QueryBuilder {
-    return new QueryBuilder(tx, rx);
+  static createFromTransaction(
+    tx: TransactionResponse,
+    rx: TransactionReceipt,
+    encoding: EncodingVersion = EncodingVersion.V1,
+  ): QueryBuilder {
+    return new QueryBuilder(tx, rx, encoding);
   }
 
   setAbiProvider(provider: (contractAddress: string) => Promise<string>) {

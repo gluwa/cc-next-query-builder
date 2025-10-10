@@ -30,7 +30,8 @@ const provider = new JsonRpcProvider(rpc);
 const transactionHash = "your transaction hash on the source chain";
 const transaction = await provider.getTransaction(transactionHash);
 const receipt = await provider.getTransactionReceipt(transactionHash);
-const builder = QueryBuilder.createFromTransaction(transaction!, receipt!);
+const encoding = EncodingVersion.V1;
+const builder = QueryBuilder.createFromTransaction(transaction!, receipt!, encoding);
 ```
 
 ## 3. Setting an ABI provider to decode the calldata and events
