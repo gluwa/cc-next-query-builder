@@ -1,21 +1,17 @@
 import {
   TransactionResponse,
   TransactionReceipt,
-  AbiCoder,
   Interface,
   JsonRpcProvider,
   LogDescription,
-  Fragment,
   Log,
-  EventFragment,
-  AccessList,
   ParamType,
   isHexString,
 } from 'ethers';
-import { FieldMetadata, MappedEncodedFields, QueryableFields } from './models';
+import { FieldMetadata, QueryableFields } from './models';
 import { computeAbiOffsets } from './abi-utils';
-import { abiEncode } from '../../encodings/abi';
-import { getAllFieldsForTransaction } from './abi-encoding-mapping';
+import { abiEncode, EncodingVersion } from '../../encodings/abi';
+import { getAllFieldsForTransaction } from './encoding-mapping';
 import { QueryBuilderForFunction } from './QueryBuilderForFunction';
 import { QueryBuilderForEvent } from './QueryBuilderForEvent';
 
@@ -27,10 +23,12 @@ export class QueryBuilder {
   private abiCache: Map<string, Interface> = new Map();
   private computedOffsets: FieldMetadata[];
   private mappedOffsets: Map<QueryableFields, FieldMetadata>;
+  private encoding: EncodingVersion;
 
-  private constructor(tx: TransactionResponse, rx: TransactionReceipt) {
+  private constructor(tx: TransactionResponse, rx: TransactionReceipt, encoding: EncodingVersion = EncodingVersion.V1) {
     this.tx = tx;
     this.rx = rx;
+    this.encoding = encoding;
 
     // compute the offsets right away.
     let { map, computedOffsets } = this.computeAllOffsets();
@@ -38,18 +36,26 @@ export class QueryBuilder {
     this.computedOffsets = computedOffsets;
   }
 
-  static async createFromTransactionHash(rpc: JsonRpcProvider, transactionHash: string): Promise<QueryBuilder> {
+  static async createFromTransactionHash(
+    rpc: JsonRpcProvider,
+    transactionHash: string,
+    encoding: EncodingVersion = EncodingVersion.V1,
+  ): Promise<QueryBuilder> {
     const tx = await rpc.getTransaction(transactionHash);
     if (!tx) throw new Error(`could not find a transaction by hash ${transactionHash}`);
 
     const rx = await rpc.getTransactionReceipt(transactionHash);
     if (!rx) throw new Error(`could not find a receipt for the transaction hash ${transactionHash}`);
 
-    return new QueryBuilder(tx, rx);
+    return new QueryBuilder(tx, rx, encoding);
   }
 
-  static createFromTransaction(tx: TransactionResponse, rx: TransactionReceipt): QueryBuilder {
-    return new QueryBuilder(tx, rx);
+  static createFromTransaction(
+    tx: TransactionResponse,
+    rx: TransactionReceipt,
+    encoding: EncodingVersion = EncodingVersion.V1,
+  ): QueryBuilder {
+    return new QueryBuilder(tx, rx, encoding);
   }
 
   setAbiProvider(provider: (contractAddress: string) => Promise<string>) {
@@ -82,10 +88,10 @@ export class QueryBuilder {
   }
 
   private computeAllOffsets() {
-    const result = abiEncode(this.tx, this.rx);
+    const result = abiEncode(this.tx, this.rx, this.encoding);
     const stronglyTypedTypes = result.types.map((type) => ParamType.from(type));
     const computedOffsets = computeAbiOffsets(stronglyTypedTypes, result.abi);
-    const fieldTypesForTransactionType = getAllFieldsForTransaction(this.tx.type);
+    const fieldTypesForTransactionType = getAllFieldsForTransaction(this.tx.type, this.encoding);
 
     if (computedOffsets.length != fieldTypesForTransactionType.fields.length)
       throw new Error(

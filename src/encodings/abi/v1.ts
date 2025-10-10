@@ -1,9 +1,8 @@
-import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, ZeroAddress } from 'ethers';
-import { addressOrZero } from './utils';
-import { EncodedFields } from './common';
+import { TransactionResponse, AccessList } from 'ethers';
+import { addressOrZero } from '../utils';
+import { EncodedFields } from '../common';
 
-export function getFieldsForType0(tx: TransactionResponse): EncodedFields {
-  //console.log('chainId', tx.chainId, 'Network V', tx.signature.networkV, 'V', tx.signature.v);
+function getFieldsForType0(tx: TransactionResponse): EncodedFields {
   return {
     types: [
       'uint8',
@@ -34,7 +33,7 @@ export function getFieldsForType0(tx: TransactionResponse): EncodedFields {
   };
 }
 
-export function getFieldsForType1(tx: TransactionResponse): EncodedFields {
+function getFieldsForType1(tx: TransactionResponse): EncodedFields {
   return {
     types: [
       'uint8',
@@ -69,7 +68,7 @@ export function getFieldsForType1(tx: TransactionResponse): EncodedFields {
   };
 }
 
-export function getFieldsForType2(tx: TransactionResponse): EncodedFields {
+function getFieldsForType2(tx: TransactionResponse): EncodedFields {
   return {
     types: [
       'uint8',
@@ -106,13 +105,13 @@ export function getFieldsForType2(tx: TransactionResponse): EncodedFields {
   };
 }
 
-export function encodeAccessList(accessList: AccessList | null) {
+function encodeAccessList(accessList: AccessList | null) {
   if (accessList == null) return [];
 
   return accessList.map((entry) => [entry.address, entry.storageKeys]);
 }
 
-export function getFieldsForType3(tx: TransactionResponse): EncodedFields {
+function getFieldsForType3(tx: TransactionResponse): EncodedFields {
   const out = {
     types: [
       'uint8',
@@ -168,31 +167,4 @@ export function getFieldsForType(tx: TransactionResponse): EncodedFields {
     default:
       throw new Error('Unsupported transaction type');
   }
-}
-
-export function getReceiptFields(rx: TransactionReceipt): EncodedFields {
-  return {
-    types: ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
-    values: [rx.status, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
-  };
-}
-
-export function getAllFields(tx: TransactionResponse, rx: TransactionReceipt): EncodedFields {
-  const txFields = getFieldsForType(tx);
-  const receiptFields = getReceiptFields(rx);
-  const allFieldTypes = [...txFields.types, ...receiptFields.types];
-  const allFieldValues = [...txFields.values, ...receiptFields.values];
-  return {
-    types: allFieldTypes,
-    values: allFieldValues,
-  };
-}
-
-export function abiEncode(tx: TransactionResponse, rx: TransactionReceipt) {
-  const allFields = getAllFields(tx, rx);
-  const abi = AbiCoder.defaultAbiCoder().encode(allFields.types, allFields.values);
-  return {
-    types: allFields.types,
-    abi,
-  };
 }
