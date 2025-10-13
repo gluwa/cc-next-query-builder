@@ -1,4 +1,4 @@
-import { TransactionResponse, AccessList } from 'ethers';
+import { TransactionResponse, AccessList, TransactionReceipt, AbiCoder } from 'ethers';
 import { addressOrZero } from '../utils';
 import { EncodedFields } from '../common';
 
@@ -154,7 +154,7 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
   return out;
 }
 
-export function getFieldsForType(tx: TransactionResponse): EncodedFields {
+function getFieldsForType(tx: TransactionResponse): EncodedFields {
   switch (tx.type) {
     case 0:
       return getFieldsForType0(tx);
@@ -167,4 +167,32 @@ export function getFieldsForType(tx: TransactionResponse): EncodedFields {
     default:
       throw new Error('Unsupported transaction type');
   }
+}
+
+function getReceiptFields(rx: TransactionReceipt): EncodedFields {
+  return {
+    types: ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
+    values: [rx.status, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
+  };
+}
+
+function getAllFields(tx: TransactionResponse, rx: TransactionReceipt): EncodedFields {
+  const txFields = getFieldsForType(tx);
+  const receiptFields = getReceiptFields(rx);
+  const allFieldTypes = [...txFields.types, ...receiptFields.types];
+  const allFieldValues = [...txFields.values, ...receiptFields.values];
+
+  return {
+    types: allFieldTypes,
+    values: allFieldValues,
+  };
+}
+
+export function abiEncode(tx: TransactionResponse, rx: TransactionReceipt) {
+  const allFields = getAllFields(tx, rx);
+  const abi = AbiCoder.defaultAbiCoder().encode(allFields.types, allFields.values);
+  return {
+    types: allFields.types,
+    abi,
+  };
 }
