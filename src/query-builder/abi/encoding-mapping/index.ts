@@ -1,29 +1,23 @@
-import { MappedEncodedFields, QueryableFields } from '../models';
+import { MappedEncodedFields } from '../models';
 import { EncodingVersion } from '../../../encodings/abi';
-import { getMappedFieldsForType as getMappedFieldsForTypeV1 } from './v1';
-
-function getMappedReceiptFields(): MappedEncodedFields {
-  return {
-    fields: [
-      { name: QueryableFields.RxStatus, type: 'uint8' },
-      { name: QueryableFields.RxGasUsed, type: 'uint64' },
-      { name: QueryableFields.RxLogs, type: 'tuple(address, bytes32[], bytes)[]' },
-      { name: QueryableFields.RxLogBlooms, type: 'bytes' },
-    ],
-  };
-}
+import {
+  getMappedFieldsForType as getMappedFieldsForTypeV1,
+  getMappedReceiptFields as getMappedReceiptFieldsV1,
+} from './v1';
 
 export function getAllFieldsForTransaction(type: number, encoding: EncodingVersion): MappedEncodedFields {
   let txFields = null;
+  let rxFields = null;
   switch (encoding) {
     case EncodingVersion.V1:
       txFields = getMappedFieldsForTypeV1(type);
+      rxFields = getMappedReceiptFieldsV1();
       break;
     default:
       txFields = getMappedFieldsForTypeV1(type);
+      rxFields = getMappedReceiptFieldsV1();
       break;
   }
-  const rxFields = getMappedReceiptFields();
   const allFields: MappedEncodedFields = {
     fields: [...txFields.fields, ...rxFields.fields],
   };

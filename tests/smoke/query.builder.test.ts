@@ -180,27 +180,27 @@ test('Build query from transactions with multiple events', async () => {
   const reader = new ForkedReader(abiEncoded.abi);
   // Assert field structure
   expect(fields.length).toBe(11);
-  expect(fields[0].offset).toBe(512);
+  expect(fields[0].offset).toBe(480);
   expect(fields[0].size).toBe(32);
-  expect(fields[1].offset).toBe(224);
+  expect(fields[1].offset).toBe(192);
   expect(fields[1].size).toBe(32);
-  expect(fields[2].offset).toBe(288);
+  expect(fields[2].offset).toBe(256);
   expect(fields[2].size).toBe(32);
-  expect(fields[3].offset).toBe(1216);
+  expect(fields[3].offset).toBe(1184);
   expect(fields[3].size).toBe(32);
-  expect(fields[4].offset).toBe(1344);
+  expect(fields[4].offset).toBe(1312);
   expect(fields[4].size).toBe(32);
-  expect(fields[5].offset).toBe(1408);
+  expect(fields[5].offset).toBe(1376);
   expect(fields[5].size).toBe(32);
-  expect(fields[6].offset).toBe(928);
+  expect(fields[6].offset).toBe(896);
   expect(fields[6].size).toBe(32);
-  expect(fields[7].offset).toBe(1056);
+  expect(fields[7].offset).toBe(1024);
   expect(fields[7].size).toBe(32);
-  expect(fields[8].offset).toBe(1088);
+  expect(fields[8].offset).toBe(1056);
   expect(fields[8].size).toBe(32);
-  expect(fields[9].offset).toBe(1120);
+  expect(fields[9].offset).toBe(1088);
   expect(fields[9].size).toBe(32);
-  expect(fields[10].offset).toBe(1184);
+  expect(fields[10].offset).toBe(1152);
   expect(fields[10].size).toBe(32);
 
   // Assert the actual data values from console output

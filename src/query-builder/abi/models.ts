@@ -1,7 +1,6 @@
 // Define queryable fields
 export enum QueryableFields {
   Type = 'type',
-  TxChainIdIsNull = 'chainIdIsNull',
   TxChainId = 'chainId',
   TxNonce = 'nonce',
   TxGasPrice = 'gasPrice',
@@ -17,10 +16,8 @@ export enum QueryableFields {
   TxYParity = 'yParity',
   TxAccessList = 'accessList',
   TxAuthorizationList = 'authorizationList',
-  TxMaxPriorityFeePerGasIsNull = 'maxPriorityFeePerGasIsNull',
   TxMaxPriorityFeePerGas = 'maxPriorityFeePerGas',
   TxMaxFeePerGas = 'maxFeePerGas',
-  TxMaxFeePerBlobGasIsNull = 'maxFeePerBlobGasIsNull',
   TxMaxFeePerBlobGas = 'maxFeePerBlobGas',
   TxBlobVersionedHashes = 'blobVersionedHashes',
   RxStatus = 'rxStatus',

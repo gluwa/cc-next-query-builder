@@ -1,6 +1,6 @@
 import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, ZeroAddress, Authorization } from 'ethers';
-import { addressOrZero } from './utils';
-import { EncodedFields } from './common';
+import { addressOrZero } from '../utils';
+import { EncodedFields } from '../common';
 
 export function getFieldsForType0(tx: TransactionResponse): EncodedFields {
   return {
@@ -78,7 +78,6 @@ function getFieldsForType2(tx: TransactionResponse): EncodedFields {
       'uint8',
       'uint64',
       'uint64',
-      'bool',
       'uint128',
       'uint128',
       'uint64',
@@ -96,7 +95,6 @@ function getFieldsForType2(tx: TransactionResponse): EncodedFields {
       tx.type,
       tx.chainId,
       tx.nonce,
-      tx.maxPriorityFeePerGas == null,
       tx.maxPriorityFeePerGas,
       tx.maxFeePerGas,
       tx.gasLimit,
@@ -123,10 +121,8 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
   const out = {
     types: [
       'uint8',
-      'bool',
       'uint64',
       'uint64',
-      'bool',
       'uint128',
       'uint128',
       'uint64',
@@ -136,7 +132,6 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
       'uint256',
       'bytes',
       'tuple(address,uint256[])[]',
-      'bool',
       'uint256',
       'bytes32[]',
       'uint8',
@@ -145,10 +140,8 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
     ],
     values: [
       tx.type,
-      tx.chainId == null,
       tx.chainId,
       tx.nonce,
-      tx.maxPriorityFeePerGas == null,
       tx.maxPriorityFeePerGas,
       tx.maxFeePerGas,
       tx.gasLimit,
@@ -158,7 +151,6 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
       tx.value,
       tx.data,
       encodeAccessList(tx.accessList),
-      tx.maxFeePerBlobGas == null,
       tx.maxFeePerBlobGas,
       tx.blobVersionedHashes,
       tx.signature.yParity,
@@ -187,10 +179,8 @@ export function getFieldsForType4(tx: TransactionResponse): EncodedFields {
   const out = {
     types: [
       'uint8',
-      'bool',
       'uint64',
       'uint64',
-      'bool',
       'uint128',
       'uint128',
       'uint64',
@@ -207,10 +197,8 @@ export function getFieldsForType4(tx: TransactionResponse): EncodedFields {
     ],
     values: [
       tx.type,
-      tx.chainId == null,
       tx.chainId,
       tx.nonce,
-      tx.maxPriorityFeePerGas == null,
       tx.maxPriorityFeePerGas,
       tx.maxFeePerGas,
       tx.gasLimit,
