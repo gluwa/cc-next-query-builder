@@ -2,7 +2,7 @@ import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, ZeroAddr
 import { addressOrZero } from '../utils';
 import { EncodedFields } from '../common';
 
-export function getFieldsForType0(tx: TransactionResponse): EncodedFields {
+function getFieldsForType0(tx: TransactionResponse): EncodedFields {
   return {
     types: [
       'uint8',
@@ -162,7 +162,7 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
   return out;
 }
 
-export function encodeAuthorizationList(authorizationList: Array<Authorization> | null) {
+function encodeAuthorizationList(authorizationList: Array<Authorization> | null) {
   if (authorizationList == null) return [];
 
   return authorizationList.map((entry) => [
@@ -175,7 +175,7 @@ export function encodeAuthorizationList(authorizationList: Array<Authorization> 
   ]);
 }
 
-export function getFieldsForType4(tx: TransactionResponse): EncodedFields {
+function getFieldsForType4(tx: TransactionResponse): EncodedFields {
   const out = {
     types: [
       'uint8',
@@ -218,7 +218,7 @@ export function getFieldsForType4(tx: TransactionResponse): EncodedFields {
   return out;
 }
 
-export function getFieldsForType(tx: TransactionResponse): EncodedFields {
+function getFieldsForType(tx: TransactionResponse): EncodedFields {
   switch (tx.type) {
     case 0:
       return getFieldsForType0(tx);
