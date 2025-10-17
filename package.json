@@ -1,6 +1,10 @@
 {
   "name": "@gluwa/cc-next-query-builder",
   "version": "0.0.6",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gluwa/cc-next-query-builder"
+  },
   "description": "sample for ccnext abi encoding PoC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
