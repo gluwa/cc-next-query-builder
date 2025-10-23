@@ -8,6 +8,7 @@ function getMappedFieldsForType0(): MappedEncodedFields {
       { name: QueryableFields.TxGasPrice, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -27,6 +28,7 @@ function getMappedFieldsForType1(): MappedEncodedFields {
       { name: QueryableFields.TxGasPrice, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -48,6 +50,7 @@ function getMappedFieldsForType2(): MappedEncodedFields {
       { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -69,6 +72,7 @@ function getMappedFieldsForType3(): MappedEncodedFields {
       { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -92,6 +96,7 @@ function getMappedFieldsForType4(): MappedEncodedFields {
       { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
       { name: QueryableFields.TxGasLimit, type: 'uint64' },
       { name: QueryableFields.TxFrom, type: 'address' },
+      { name: QueryableFields.TxToIsNull, type: 'bool' },
       { name: QueryableFields.TxTo, type: 'address' },
       { name: QueryableFields.TxValue, type: 'uint256' },
       { name: QueryableFields.TxData, type: 'bytes' },
@@ -119,4 +124,15 @@ export function getMappedFieldsForType(type: number): MappedEncodedFields {
     default:
       throw new Error('Unsupported transaction type');
   }
+}
+
+export function getMappedReceiptFields(): MappedEncodedFields {
+  return {
+    fields: [
+      { name: QueryableFields.RxStatus, type: 'uint8' },
+      { name: QueryableFields.RxGasUsed, type: 'uint64' },
+      { name: QueryableFields.RxLogs, type: 'tuple(address, bytes32[], bytes)[]' },
+      { name: QueryableFields.RxLogBlooms, type: 'bytes' },
+    ],
+  };
 }

@@ -6,6 +6,7 @@ export enum QueryableFields {
   TxGasPrice = 'gasPrice',
   TxGasLimit = 'gasLimit',
   TxFrom = 'from',
+  TxToIsNull = 'toIsNull',
   TxTo = 'to',
   TxValue = 'value',
   TxData = 'data',

@@ -1,4 +1,4 @@
-import { TransactionResponse, AccessList, TransactionReceipt, AbiCoder } from 'ethers';
+import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, ZeroAddress, Authorization } from 'ethers';
 import { addressOrZero } from '../utils';
 import { EncodedFields } from '../common';
 
@@ -10,6 +10,7 @@ function getFieldsForType0(tx: TransactionResponse): EncodedFields {
       'uint128',
       'uint64',
       'address',
+      'bool',
       'address',
       'uint256',
       'bytes',
@@ -23,6 +24,7 @@ function getFieldsForType0(tx: TransactionResponse): EncodedFields {
       tx.gasPrice,
       tx.gasLimit,
       tx.from,
+      tx.to == null,
       addressOrZero(tx.to),
       tx.value,
       tx.data,
@@ -42,6 +44,7 @@ function getFieldsForType1(tx: TransactionResponse): EncodedFields {
       'uint128',
       'uint64',
       'address',
+      'bool',
       'address',
       'uint256',
       'bytes',
@@ -57,6 +60,7 @@ function getFieldsForType1(tx: TransactionResponse): EncodedFields {
       tx.gasPrice,
       tx.gasLimit,
       tx.from,
+      tx.to == null,
       addressOrZero(tx.to),
       tx.value,
       tx.data,
@@ -78,6 +82,7 @@ function getFieldsForType2(tx: TransactionResponse): EncodedFields {
       'uint128',
       'uint64',
       'address',
+      'bool',
       'address',
       'uint256',
       'bytes',
@@ -94,6 +99,7 @@ function getFieldsForType2(tx: TransactionResponse): EncodedFields {
       tx.maxFeePerGas,
       tx.gasLimit,
       tx.from,
+      tx.to == null,
       addressOrZero(tx.to),
       tx.value,
       tx.data,
@@ -121,6 +127,7 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
       'uint128',
       'uint64',
       'address',
+      'bool',
       'address',
       'uint256',
       'bytes',
@@ -139,12 +146,69 @@ function getFieldsForType3(tx: TransactionResponse): EncodedFields {
       tx.maxFeePerGas,
       tx.gasLimit,
       tx.from,
+      tx.to == null,
       addressOrZero(tx.to),
       tx.value,
       tx.data,
       encodeAccessList(tx.accessList),
       tx.maxFeePerBlobGas,
       tx.blobVersionedHashes,
+      tx.signature.yParity,
+      tx.signature.r,
+      tx.signature.s,
+    ],
+  };
+
+  return out;
+}
+
+function encodeAuthorizationList(authorizationList: Array<Authorization> | null) {
+  if (authorizationList == null) return [];
+
+  return authorizationList.map((entry) => [
+    entry.chainId,
+    entry.address,
+    entry.nonce,
+    entry.signature.yParity,
+    entry.signature.r,
+    entry.signature.s,
+  ]);
+}
+
+function getFieldsForType4(tx: TransactionResponse): EncodedFields {
+  const out = {
+    types: [
+      'uint8',
+      'uint64',
+      'uint64',
+      'uint128',
+      'uint128',
+      'uint64',
+      'address',
+      'bool',
+      'address',
+      'uint256',
+      'bytes',
+      'tuple(address,uint256[])[]',
+      'tuple(uint256,address,uint64,uint8,uint256,uint256)[]',
+      'uint8',
+      'bytes32',
+      'bytes32',
+    ],
+    values: [
+      tx.type,
+      tx.chainId,
+      tx.nonce,
+      tx.maxPriorityFeePerGas,
+      tx.maxFeePerGas,
+      tx.gasLimit,
+      tx.from,
+      tx.to == null,
+      addressOrZero(tx.to),
+      tx.value,
+      tx.data,
+      encodeAccessList(tx.accessList),
+      encodeAuthorizationList(tx.authorizationList),
       tx.signature.yParity,
       tx.signature.r,
       tx.signature.s,
@@ -164,6 +228,8 @@ function getFieldsForType(tx: TransactionResponse): EncodedFields {
       return getFieldsForType2(tx);
     case 3:
       return getFieldsForType3(tx);
+    case 4:
+      return getFieldsForType4(tx);
     default:
       throw new Error('Unsupported transaction type');
   }
