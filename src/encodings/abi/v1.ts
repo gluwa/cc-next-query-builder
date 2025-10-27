@@ -238,7 +238,7 @@ function getFieldsForType(tx: TransactionResponse): EncodedFields {
 function getReceiptFields(rx: TransactionReceipt): EncodedFields {
   return {
     types: ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
-    values: [rx.status, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
+    values: [rx.status ?? 1, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
   };
 }
 
