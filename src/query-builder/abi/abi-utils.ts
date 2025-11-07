@@ -78,7 +78,7 @@ function decodeRecursive(reader: ForkedReader, paramTypes: ParamType[], baseOffs
           const numberOfElements = subReader.readIndex();
 
           if (isDynamic(currentParam.arrayChildren)) {
-            const dynamicArrayRelativeOffsets = [];
+            const dynamicArrayRelativeOffsets: number[] = [];
             for (let i = 0; i < numberOfElements; i++) {
               dynamicArrayRelativeOffsets.push(toNumber(subReader.readBytes(32)));
             }
@@ -91,6 +91,30 @@ function decodeRecursive(reader: ForkedReader, paramTypes: ParamType[], baseOffs
               const relativeStart = arrayElementOffset - sizeOfOffsets;
               const arrayItemSubReader = subReader.subReader(relativeStart);
 
+              // STRICT FIX: Only handle bytes/string arrays differently
+              if (currentParam.arrayChildren.type === 'bytes' || currentParam.arrayChildren.type === 'string') {
+                // For bytes/string in arrays, arrayElementOffset is relative to the start of offsets array
+                // Offsets array starts at fieldDynamicOffset + WORD_SIZE (after array length prefix)
+                // So absolute position is: baseOffset + fieldDynamicOffset + WORD_SIZE + arrayElementOffset
+                const absoluteDataOffset = baseOffset + fieldDynamicOffset + WORD_SIZE + arrayElementOffset;
+                const dataSubReader = reader.subReaderAbsolute(absoluteDataOffset);
+                const length = dataSubReader.readIndex();
+
+                if (length === 0) {
+                  console.warn(`Warning: Chunk ${index} has length 0 at offset ${absoluteDataOffset}`);
+                }
+
+                return <FieldMetadata>{
+                  type: currentParam.arrayChildren.format('full'),
+                  offset: absoluteDataOffset + WORD_SIZE, // Absolute position of data start (after length prefix)
+                  isDynamic: true,
+                  size: length,
+                  value: hexlify(dataSubReader.readBytes(length)),
+                  children: [],
+                };
+              }
+
+              // Original code path for tuples and other types (unchanged)
               // the only problem is to calculate the absolute position
               // its a bit more complicated you need to consider the offset since the begining
               // so hmm at this point the sub reader has already read all the offset so its cursor is kind of already at the right place.

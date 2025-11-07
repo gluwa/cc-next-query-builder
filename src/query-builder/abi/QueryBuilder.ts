@@ -5,15 +5,13 @@ import {
   JsonRpcProvider,
   LogDescription,
   Log,
-  ParamType,
   isHexString,
 } from 'ethers';
 import { FieldMetadata, QueryableFields } from './models';
-import { computeAbiOffsets } from './abi-utils';
-import { abiEncode, EncodingVersion } from '../../encodings/abi';
-import { getAllFieldsForTransaction } from './encoding-mapping';
+import { EncodingVersion } from '../../encodings/abi';
 import { QueryBuilderForFunction } from './QueryBuilderForFunction';
 import { QueryBuilderForEvent } from './QueryBuilderForEvent';
+import { computeAllOffsets } from './offset-utils';
 
 export class QueryBuilder {
   private tx!: TransactionResponse;
@@ -31,7 +29,7 @@ export class QueryBuilder {
     this.encoding = encoding;
 
     // compute the offsets right away.
-    let { map, computedOffsets } = this.computeAllOffsets();
+    let { map, computedOffsets } = computeAllOffsets(this.tx, this.rx, this.encoding);
     this.mappedOffsets = map;
     this.computedOffsets = computedOffsets;
   }
@@ -85,34 +83,6 @@ export class QueryBuilder {
       this.abiCache.set(contractAddress, new Interface(abi));
     }
     return this.abiCache.get(contractAddress)!;
-  }
-
-  private computeAllOffsets() {
-    const result = abiEncode(this.tx, this.rx, this.encoding);
-    const stronglyTypedTypes = result.types.map((type) => ParamType.from(type));
-    const computedOffsets = computeAbiOffsets(stronglyTypedTypes, result.abi);
-    const fieldTypesForTransactionType = getAllFieldsForTransaction(this.tx.type, this.encoding);
-
-    if (computedOffsets.length != fieldTypesForTransactionType.fields.length)
-      throw new Error(
-        'the number of fields of computed offsets should match the number of fields of the transaction..',
-      );
-
-    const map = new Map<QueryableFields, FieldMetadata>();
-    fieldTypesForTransactionType.fields.forEach((field, index) => {
-      let computedOffset = computedOffsets[index];
-      const fieldType = ParamType.from(field.type);
-      const computedOffsetType = ParamType.from(computedOffset.type);
-      if (fieldType.type != computedOffsetType.type) {
-        throw new Error(
-          `Types of computed offset should match field type.. ${fieldType.type} != ${computedOffsetType.type}`,
-        );
-      }
-
-      map.set(field.name, computedOffsets[index]);
-    });
-
-    return { map, computedOffsets };
   }
 
   addStaticField(field: QueryableFields) {
