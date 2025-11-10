@@ -20,9 +20,12 @@ function encodeCommonFields(tx: TransactionResponse): string {
  */
 function encodeReceiptFields(rx: TransactionReceipt): string {
   const coder = AbiCoder.defaultAbiCoder();
+
+  // For status field, default to 1 (success) if undefined (pre-EIP-658 receipts)
+  // See: https://eips.ethereum.org/EIPS/eip-658
   return coder.encode(
     ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
-    [rx.status, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
+    [rx.status ?? 1, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
   );
 }
 
