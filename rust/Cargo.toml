@@ -1,0 +1,43 @@
+[package]
+name = "rust-block-encoder"
+authors = ["Gluwa Inc. Developer Support <support.dev@gluwa.com>"]
+edition = "2021"
+license = "MIT"
+publish = false
+repository = "https://github.com/gluwa/cc-next-query-builder"
+version = "0.1.0"
+
+[[bin]]
+name = "encode-blocks"
+path = "bin/encode_blocks.rs"
+
+[dependencies]
+anyhow = "1.0"
+ccnext-abi-encoding = { version = "0.3" }
+clap = { version = "4.5.3", features = ["derive"] }
+tokio = { version = "1.37.0", features = [
+    "macros",
+    "rt-multi-thread",
+    "time",
+    "signal",
+] }
+futures-util = "0.3.31"
+alloy = { version = "0.11", features = [
+    "provider-ws",
+    "pubsub",
+] }
+hex = "0.4.3"
+serde_json = "1.0.145"
+
+[profile.release]
+# Substrate runtime requires unwinding.
+panic = "unwind"
+
+[profile.production]
+inherits = "release"
+
+# Sacrifice compile speed for execution speed by using optimization flags:
+
+# https://doc.rust-lang.org/rustc/linker-plugin-lto.html
+codegen-units = 1
+lto = "fat"
