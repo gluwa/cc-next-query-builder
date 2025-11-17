@@ -31,7 +31,10 @@ jobs:
         with:
           toolchain: ${{ env.RUSTC_VERSION }}
           components: rustfmt
+
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
 
       - name: Check formatting
         working-directory: rust
@@ -53,7 +56,10 @@ jobs:
         with:
           toolchain: ${{ env.RUSTC_VERSION }}
           targets: wasm32-unknown-unknown
+
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
 
       - name: Check Build
         working-directory: rust
