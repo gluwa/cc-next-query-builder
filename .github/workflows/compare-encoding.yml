@@ -60,13 +60,13 @@ jobs:
           cargo build --release
 
       - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
-        timeout-minutes: ${{ fromJSON(needs.setup.outputs.timeout-minutes) }}
-        continue-on-error: true
         working-directory: rust
         run: |
           ./target/release/encode-blocks \
             --eth-rpc-url wss://blockchain.googleapis.com/v1/projects/usc-integration-test/locations/asia-east1/endpoints/ethereum-sepolia/rpc?key=${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }} \
             --path-to-store-json /var/tmp/encoded-data/alloy/
+        env:
+            TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
       - name: Upload encoded data
         if: always()
@@ -92,12 +92,12 @@ jobs:
       - run: npm run build --if-present
 
       - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
-        timeout-minutes: ${{ fromJSON(needs.setup.outputs.timeout-minutes) }}
-        continue-on-error: true
         run: |
           node dist/bin/encode-blocks.js \
             https://blockchain.googleapis.com/v1/projects/usc-integration-test/locations/asia-east1/endpoints/ethereum-sepolia/rpc?key=${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }} \
             /var/tmp/encoded-data/ethers/
+        env:
+            TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
       - name: Upload encoded data
         if: always()

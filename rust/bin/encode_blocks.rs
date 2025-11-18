@@ -10,8 +10,10 @@ use ccnext_abi_encoding::common::EncodingVersion;
 use clap::Parser;
 use futures_util::StreamExt;
 use hex;
+use std::env;
 use std::fs;
 use std::str::FromStr;
+use std::time::SystemTime;
 
 #[derive(Parser, Debug)]
 #[command(name = "encode-blocks")]
@@ -100,6 +102,10 @@ async fn block_handler(
 async fn main() -> Result<()> {
     let args = CliArguments::parse();
 
+    let start = SystemTime::now();
+    let timeout_minutes: u64 = env::var("TIMEOUT_MINUTES").unwrap_or("2".into()).parse()?;
+    println!("=== starting with timeout {:?} mins ...", timeout_minutes);
+
     fs::create_dir_all(args.path_to_store_json.clone())?;
 
     let provider = ProviderBuilder::new()
@@ -115,6 +121,15 @@ async fn main() -> Result<()> {
             args.path_to_store_json.clone(),
         )
         .await;
+
+        let current = start.elapsed()?;
+        if current.as_secs() >= timeout_minutes * 60 {
+            println!(
+                "=== {:?} mins timeout reached. exiting ...",
+                timeout_minutes
+            );
+            break;
+        }
     }
 
     Ok(())

@@ -42,6 +42,10 @@ async function blockHandler(
 }
 
 async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<void> {
+  const start = Date.now();
+  const timeoutMinutes = parseInt(process.env.TIMEOUT_MINUTES || '2');
+  console.log(`=== starting with timeout ${timeoutMinutes} mins ...`);
+
   mkdirSync(pathToStoreJson, { recursive: true });
 
   const provider = new JsonRpcProvider(rpcUrl);
@@ -51,16 +55,12 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
   provider.on('block', async (blockNumber) => {
     // cost: (80 + 160 * <txns in block>)
     await blockHandler('block', provider, blockNumber, pathToStoreJson);
-  });
 
-  // try explicitly querying a block range of 1000 blocks
-  // WARNING: this always hits rate limits
-  //  const latestBlock = await provider.getBlock('latest');
-  //  const latestNumber = latestBlock?.number || 0;
-  //  console.log(`*** starting latest block is ${latestNumber}`);
-  //  for (let blockNumber = latestNumber - 1000; blockNumber < latestNumber; blockNumber++) {
-  //    await blockHandler("explicit", provider, blockNumber);
-  //  }
+    if (Math.floor((Date.now() - start) / 60000) >= timeoutMinutes) {
+        console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
+        process.exit(0);
+    }
+  });
 }
 
 if (process.argv.length < 4) {
