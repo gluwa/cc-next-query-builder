@@ -1,7 +1,7 @@
 use alloy::{
     primitives::B256,
     providers::{Provider, ProviderBuilder, WsConnect},
-    rpc::types::BlockTransactionsKind,
+    rpc::types::{BlockTransactionsKind, TransactionReceipt},
 };
 
 use anyhow::Result;
@@ -25,7 +25,11 @@ pub struct CliArguments {
     pub path_to_store_json: String,
 }
 
-async fn encode_transaction(provider: impl Provider, tx_hash_str: &str) -> String {
+async fn encode_transaction(
+    provider: impl Provider,
+    tx_hash_str: &str,
+    rx_or_none: Option<TransactionReceipt>,
+) -> String {
     let tx_hash = B256::from_str(tx_hash_str).unwrap();
 
     let tx = provider
@@ -34,16 +38,32 @@ async fn encode_transaction(provider: impl Provider, tx_hash_str: &str) -> Strin
         .unwrap()
         .unwrap();
 
-    let rx = provider
-        .get_transaction_receipt(tx_hash)
-        .await
-        .unwrap()
-        .unwrap();
+    let mut rx = rx_or_none.clone();
+    if rx_or_none.is_none() {
+        rx = provider.get_transaction_receipt(tx_hash).await.unwrap();
+    }
 
-    let encoded_data = abi_encode(tx, rx, EncodingVersion::V1).unwrap();
+    let encoded_data = abi_encode(tx, rx.expect("receipt missing"), EncodingVersion::V1).unwrap();
     let as_str = hex::encode(encoded_data.abi());
 
     format!("0x{}", as_str)
+}
+
+async fn encode_and_write_to_disk(
+    path: String,
+    provider: impl Provider,
+    block_number: u64,
+    tx_hash: String,
+    rx_or_none: Option<TransactionReceipt>,
+) {
+    let encoded_data = encode_transaction(provider, &tx_hash.to_string(), rx_or_none).await;
+
+    // <path>/<block_num>/<tx_hash>.txt
+    fs::write(
+        format!("{}/{}/{}.txt", path, block_number, tx_hash.to_string()),
+        encoded_data + "\n",
+    )
+    .unwrap();
 }
 
 async fn block_handler(
@@ -62,31 +82,61 @@ async fn block_handler(
 
     let tx_hashes = block.transactions.hashes();
 
-    // encode in parallel b/c there could be thousand transactions in a block
-    let tasks: Vec<_> = tx_hashes
-        .clone()
-        .into_iter()
-        .map(|tx_hash| {
-            tokio::spawn({
-                let prv = provider.clone();
-                let path = path_to_store_json.clone();
-                async move {
-                    let encoded_data = encode_transaction(prv.clone(), &tx_hash.to_string()).await;
-
-                    // <path>/<block_num>/<tx_hash>.txt
-                    fs::write(
-                        format!("{}/{}/{}.txt", path, block_number, tx_hash.to_string()),
-                        encoded_data + "\n",
-                    )
-                    .unwrap();
-                }
+    if tx_hashes.len() >= 13 {
+        // optimize RPC cost by fetching all receipts at once
+        let receipts = provider
+            .get_block_receipts(block_number.into())
+            .await?
+            .unwrap();
+        let tasks: Vec<_> = receipts
+            .into_iter()
+            .map(|rcp| {
+                tokio::spawn({
+                    let prv = provider.clone();
+                    let path = path_to_store_json.clone();
+                    async move {
+                        encode_and_write_to_disk(
+                            path.clone(),
+                            prv.clone(),
+                            block_number,
+                            rcp.transaction_hash.to_string(),
+                            Some(rcp),
+                        )
+                        .await;
+                    }
+                })
             })
-        })
-        .collect();
+            .collect();
 
-    // await all tasks to complete
-    for task in tasks {
-        task.await.unwrap();
+        for task in tasks {
+            task.await.unwrap();
+        }
+    } else {
+        // loop over each transaction and fetch its receipt via explicit RPC call
+        let tasks: Vec<_> = tx_hashes
+            .clone()
+            .into_iter()
+            .map(|tx_hash| {
+                tokio::spawn({
+                    let prv = provider.clone();
+                    let path = path_to_store_json.clone();
+                    async move {
+                        encode_and_write_to_disk(
+                            path.clone(),
+                            prv.clone(),
+                            block_number,
+                            tx_hash.to_string(),
+                            None,
+                        )
+                        .await;
+                    }
+                })
+            })
+            .collect();
+
+        for task in tasks {
+            task.await.unwrap();
+        }
     }
 
     println!(

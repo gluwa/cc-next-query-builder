@@ -1,14 +1,60 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { JsonRpcProvider } from 'ethers';
+import { Block, JsonRpcProvider, TransactionReceipt } from 'ethers';
 import { abiEncode } from '../encodings/abi';
 
-async function encodeTransaction(provider: JsonRpcProvider, txHash: string): Promise<string> {
+/**
+ * Gets all transaction receipts for a given block using regular Infura/compatible RPC format.
+ * Uses hexadecimal block number format (e.g., "0x1a2b3c").
+ *
+ * @param rpc - The ethers JsonRpcApiProvider instance
+ * @param block - The block to get receipts for
+ * @returns Array of transaction receipts for the block
+ */
+async function getBlockReceipts(rpc: JsonRpcProvider, block: Block): Promise<TransactionReceipt[]> {
+  // Regular Infura/compatible RPC takes block number as hexadecimal string
+  const finalBlockNumber = `0x${block.number.toString(16)}`;
+
+  // Call the RPC method to get all receipts for the block
+  const receiptsRaw: Array<any> = await rpc.send('eth_getBlockReceipts', [finalBlockNumber]);
+
+  // Wrap raw receipts into proper TransactionReceipt objects
+  const receipts = receiptsRaw.map((r) => {
+    const receipt = rpc._wrapTransactionReceipt(r, rpc._network);
+    return receipt;
+  });
+
+  return receipts;
+}
+
+// cost 80 or 160 credits depnding on arguments
+async function encodeTransaction(
+  provider: JsonRpcProvider,
+  txHash: string,
+  receipt: TransactionReceipt | null,
+): Promise<string> {
   // 80 credits
   const transaction = await provider.getTransaction(txHash);
-  // 80 credits
-  const receipt = await provider.getTransactionReceipt(txHash);
+
+  if (receipt === null) {
+    // 80 credits
+    const receipt = await provider.getTransactionReceipt(txHash);
+  }
   const encodedData = abiEncode(transaction!, receipt!);
   return encodedData.abi;
+}
+
+async function encodeAndWriteToDisk(
+  pathToStoreJson: string,
+  provider: JsonRpcProvider,
+  blockNumber: number,
+  txHash: string,
+  receipt: TransactionReceipt | null,
+) {
+  const encodedData = await encodeTransaction(provider, txHash, receipt);
+
+  writeFileSync(`${pathToStoreJson}/${blockNumber}/${txHash}.txt`, encodedData + '\n', {
+    flag: 'w',
+  });
 }
 
 // https://docs.metamask.io/services/get-started/pricing/credit-cost#standard-ethereum-compliant-methods
@@ -27,16 +73,23 @@ async function blockHandler(
   const block = await provider.getBlock(blockNumber);
   const txHashes = block?.transactions || [];
 
-  await Promise.all(
-    txHashes.map(async (txHash) => {
-      // cost: 160 credits
-      const encodedData = await encodeTransaction(provider, txHash);
+  if (txHashes?.length >= 13) {
+    // optimize RPC cost by fetching all receipts at once
+    const receipts = await getBlockReceipts(provider, block!);
 
-      writeFileSync(`${pathToStoreJson}/${blockNumber}/${txHash}.txt`, encodedData + '\n', {
-        flag: 'w',
-      });
-    }),
-  );
+    await Promise.all(
+      receipts.map(async (receipt) => {
+        await encodeAndWriteToDisk(pathToStoreJson, provider, blockNumber, receipt.hash, receipt);
+      }),
+    );
+  } else {
+    // loop over each transaction and fetch its receipt via explicit RPC call
+    await Promise.all(
+      txHashes.map(async (txHash) => {
+        await encodeAndWriteToDisk(pathToStoreJson, provider, blockNumber, txHash, null);
+      }),
+    );
+  }
 
   console.log(`<<< done encoding ${txHashes?.length} transactions in block ${blockNumber}`);
 }
@@ -57,8 +110,8 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
     await blockHandler('block', provider, blockNumber, pathToStoreJson);
 
     if (Math.floor((Date.now() - start) / 60000) >= timeoutMinutes) {
-        console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
-        process.exit(0);
+      console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
+      process.exit(0);
     }
   });
 }
