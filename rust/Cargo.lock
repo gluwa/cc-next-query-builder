@@ -1104,9 +1104,9 @@ dependencies = [
 
 [[package]]
 name = "ccnext-abi-encoding"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b341c8624b037098d563c8b04efaaee84ffecc4273353f2e100f5df5cf28206"
+checksum = "74251a2c8e836e793179b15b852bb1599fbc6649414590ac2e535135b5417f9e"
 dependencies = [
  "alloy",
  "serde",

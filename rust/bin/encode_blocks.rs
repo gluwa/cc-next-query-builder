@@ -5,7 +5,8 @@ use alloy::{
 };
 
 use anyhow::Result;
-use ccnext_abi_encoding::abi::{abi_encode, EncodingVersion};
+use ccnext_abi_encoding::abi::abi_encode;
+use ccnext_abi_encoding::common::EncodingVersion;
 use clap::Parser;
 use futures_util::StreamExt;
 use hex;
@@ -37,9 +38,9 @@ async fn encode_transaction(provider: impl Provider, tx_hash_str: &str) -> Strin
         .unwrap()
         .unwrap();
 
-    let bytes = abi_encode(tx, rx, EncodingVersion::V1).unwrap().abi;
+    let encoded_data = abi_encode(tx, rx, EncodingVersion::V1).unwrap();
+    let as_str = hex::encode(encoded_data.abi());
 
-    let as_str = hex::encode(bytes);
     format!("0x{}", as_str)
 }
 
