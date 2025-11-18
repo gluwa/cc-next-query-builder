@@ -130,7 +130,7 @@ function getChunksForType3(tx: TransactionResponse, rx: TransactionReceipt): str
 
   // Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
   const chunk2 = coder.encode(
-    ['uint64', 'uint128', 'uint128', 'tuple(address,uint256[])[]'],
+    ['uint64', 'uint128', 'uint128', 'tuple(address,bytes32[])[]'],
     [tx.chainId, tx.maxPriorityFeePerGas, tx.maxFeePerGas, encodeAccessList(tx.accessList)],
   );
 
@@ -174,7 +174,7 @@ function getChunksForType4(tx: TransactionResponse, rx: TransactionReceipt): str
 
   // Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
   const chunk2 = coder.encode(
-    ['uint64', 'uint128', 'uint128', 'tuple(address,uint256[])[]'],
+    ['uint64', 'uint128', 'uint128', 'tuple(address,bytes32[])[]'],
     [tx.chainId, tx.maxPriorityFeePerGas, tx.maxFeePerGas, encodeAccessList(tx.accessList)],
   );
 
@@ -276,7 +276,7 @@ function getTypesForType(txType: number): string[] {
         'uint64',
         'uint128',
         'uint128',
-        'tuple(address,uint256[])[]',
+        'tuple(address,bytes32[])[]',
         'uint256',
         'bytes32[]',
         'uint8',
@@ -303,7 +303,7 @@ function getTypesForType(txType: number): string[] {
         'uint64',
         'uint128',
         'uint128',
-        'tuple(address,uint256[])[]',
+        'tuple(address,bytes32[])[]',
         'tuple(uint256,address,uint64,uint8,uint256,uint256)[]',
         'uint8',
         'bytes32',

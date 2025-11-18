@@ -1,6 +1,6 @@
 import { TransactionResponse, TransactionReceipt, AbiCoder, ParamType } from 'ethers';
 import { FieldMetadata, QueryableFields } from './models';
-import { computeAbiOffsets } from './abi-utils';
+import { computeAbiOffsets, WORD_SIZE } from './abi-utils';
 import { abiEncode, EncodingVersion } from '../../encodings/abi';
 import { getAllFieldsForTransaction } from './encoding-mapping';
 
@@ -121,7 +121,7 @@ export function computeAllOffsets(
   // Handle type_ separately since it's encoded as the first uint8 parameter (not in chunks)
   map.set(QueryableFields.Type, {
     type: 'uint8',
-    offset: 32, // First 32 bytes after bytes memory length prefix
+    offset: WORD_SIZE, // First 32 bytes after bytes memory length prefix
     isDynamic: false,
     size: 1,
     children: [],

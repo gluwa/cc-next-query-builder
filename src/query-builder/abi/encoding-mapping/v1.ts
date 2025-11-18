@@ -141,7 +141,7 @@ function getMappedFieldsForType3(): MappedEncodedFields {
           { name: QueryableFields.TxChainId, type: 'uint64' },
           { name: QueryableFields.TxMaxPriorityFeePerGas, type: 'uint128' },
           { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
-          { name: QueryableFields.TxAccessList, type: 'tuple(address,uint256[])[]' },
+          { name: QueryableFields.TxAccessList, type: 'tuple(address,bytes32[])[]' },
         ],
       },
       // Chunk 3: Type-specific fields part 2 (maxFeePerBlobGas, blobVersionedHashes, yParity, r, s)
@@ -189,7 +189,7 @@ function getMappedFieldsForType4(): MappedEncodedFields {
           { name: QueryableFields.TxChainId, type: 'uint64' },
           { name: QueryableFields.TxMaxPriorityFeePerGas, type: 'uint128' },
           { name: QueryableFields.TxMaxFeePerGas, type: 'uint128' },
-          { name: QueryableFields.TxAccessList, type: 'tuple(address,uint256[])[]' },
+          { name: QueryableFields.TxAccessList, type: 'tuple(address,bytes32[])[]' },
         ],
       },
       // Chunk 3: Type-specific fields part 2 (authorizationList, yParity, r, s)

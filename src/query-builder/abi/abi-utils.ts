@@ -3,7 +3,7 @@ import { FieldMetadata } from './models';
 import { ForkedReader } from '../common/ForkedReader';
 import { isDynamic } from '../common/is-dynamic';
 
-const WORD_SIZE = 32;
+export const WORD_SIZE = 32;
 
 /**
  * Computes ABI field offsets by encoding, decoding, and analyzing offsets recursively.
@@ -80,13 +80,13 @@ function decodeRecursive(reader: ForkedReader, paramTypes: ParamType[], baseOffs
           if (isDynamic(currentParam.arrayChildren)) {
             const dynamicArrayRelativeOffsets: number[] = [];
             for (let i = 0; i < numberOfElements; i++) {
-              dynamicArrayRelativeOffsets.push(toNumber(subReader.readBytes(32)));
+              dynamicArrayRelativeOffsets.push(toNumber(subReader.readBytes(WORD_SIZE)));
             }
 
             // now we can start decoding the children :)
             const sizeOfOffsets = numberOfElements * WORD_SIZE;
             field.children = dynamicArrayRelativeOffsets.map((arrayElementOffset, index) => {
-              // at the moment whats important is to take the arrayElementOffset which is the position mimus the number of size offsets * 32
+              // at the moment whats important is to take the arrayElementOffset which is the position mimus the number of size offsets * WORD_SIZE
               // this is then creating a new buffer from current subReader.consumed + offset of array element - (sizeOfOffsets)
               const relativeStart = arrayElementOffset - sizeOfOffsets;
               const arrayItemSubReader = subReader.subReader(relativeStart);
@@ -141,14 +141,6 @@ function decodeRecursive(reader: ForkedReader, paramTypes: ParamType[], baseOffs
                 // if the child was a tuple it would not work
                 // this ensures we recursive for sub types as well
                 return decodeRecursive(subReader, [currentParam.arrayChildren], field.offset)[0];
-                // return <FieldMetadata>{
-                //     isDynamic: false,
-                //     offset: field.offset + subReader.consumed,
-                //     type: currentParam.arrayChildren.format("full"),
-                //     size: 32,
-                //     value: hexlify(subReader.readBytes(WORD_SIZE)),
-                //     children: []
-                // };
               });
           }
         }
