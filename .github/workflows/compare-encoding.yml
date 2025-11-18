@@ -21,9 +21,6 @@ permissions: read-all
 
 jobs:
   setup:
-    if: github.env.SEPOLIA_RPC_KEY
-    env:
-      SEPOLIA_RPC_KEY: ${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }}
     runs-on: ubuntu-24.04
     outputs:
       timeout-minutes: ${{ steps.cron-env.outputs.timeout-minutes || 3 }}
