@@ -29,7 +29,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.2.3",
     "ethers": "^6.15.0"
   },
   "author": "Gluwa Inc.",
