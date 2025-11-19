@@ -75,6 +75,13 @@ jobs:
         env:
             TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
+      - name: Add notices in case of failure
+        if: failure()
+        run: |
+          # note: GitHub appears to display these in reverse order
+          echo "::notice::SUGGESTION: Trigger this workflow manually against the same branch to verify the changes."
+          echo "::notice::IMPORTANT:  Secret credentials may be missing for PRs from Dependabot!"
+
       - name: Upload encoded data
         if: always()
         uses: actions/upload-artifact@v5
@@ -106,6 +113,13 @@ jobs:
             /var/tmp/encoded-data/ethers/
         env:
             TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
+
+      - name: Add notices in case of failure
+        if: failure()
+        run: |
+          # note: GitHub appears to display these in reverse order
+          echo "::notice::SUGGESTION: Trigger this workflow manually against the same branch to verify the changes."
+          echo "::notice::IMPORTANT:  Secret credentials may be missing for PRs from Dependabot!"
 
       - name: Upload encoded data
         if: always()
