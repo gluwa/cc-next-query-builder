@@ -3,7 +3,7 @@ import { FieldMetadata } from './models';
 import { ForkedReader } from '../common/ForkedReader';
 import { isDynamic } from '../common/is-dynamic';
 
-const WORD_SIZE = 32;
+export const WORD_SIZE = 32;
 
 /**
  * Computes ABI field offsets by encoding, decoding, and analyzing offsets recursively.
@@ -78,19 +78,43 @@ function decodeRecursive(reader: ForkedReader, paramTypes: ParamType[], baseOffs
           const numberOfElements = subReader.readIndex();
 
           if (isDynamic(currentParam.arrayChildren)) {
-            const dynamicArrayRelativeOffsets = [];
+            const dynamicArrayRelativeOffsets: number[] = [];
             for (let i = 0; i < numberOfElements; i++) {
-              dynamicArrayRelativeOffsets.push(toNumber(subReader.readBytes(32)));
+              dynamicArrayRelativeOffsets.push(toNumber(subReader.readBytes(WORD_SIZE)));
             }
 
             // now we can start decoding the children :)
             const sizeOfOffsets = numberOfElements * WORD_SIZE;
             field.children = dynamicArrayRelativeOffsets.map((arrayElementOffset, index) => {
-              // at the moment whats important is to take the arrayElementOffset which is the position mimus the number of size offsets * 32
+              // at the moment whats important is to take the arrayElementOffset which is the position mimus the number of size offsets * WORD_SIZE
               // this is then creating a new buffer from current subReader.consumed + offset of array element - (sizeOfOffsets)
               const relativeStart = arrayElementOffset - sizeOfOffsets;
               const arrayItemSubReader = subReader.subReader(relativeStart);
 
+              // STRICT FIX: Only handle bytes/string arrays differently
+              if (currentParam.arrayChildren.type === 'bytes' || currentParam.arrayChildren.type === 'string') {
+                // For bytes/string in arrays, arrayElementOffset is relative to the start of offsets array
+                // Offsets array starts at fieldDynamicOffset + WORD_SIZE (after array length prefix)
+                // So absolute position is: baseOffset + fieldDynamicOffset + WORD_SIZE + arrayElementOffset
+                const absoluteDataOffset = baseOffset + fieldDynamicOffset + WORD_SIZE + arrayElementOffset;
+                const dataSubReader = reader.subReaderAbsolute(absoluteDataOffset);
+                const length = dataSubReader.readIndex();
+
+                if (length === 0) {
+                  console.warn(`Warning: Chunk ${index} has length 0 at offset ${absoluteDataOffset}`);
+                }
+
+                return <FieldMetadata>{
+                  type: currentParam.arrayChildren.format('full'),
+                  offset: absoluteDataOffset + WORD_SIZE, // Absolute position of data start (after length prefix)
+                  isDynamic: true,
+                  size: length,
+                  value: hexlify(dataSubReader.readBytes(length)),
+                  children: [],
+                };
+              }
+
+              // Original code path for tuples and other types (unchanged)
               // the only problem is to calculate the absolute position
               // its a bit more complicated you need to consider the offset since the begining
               // so hmm at this point the sub reader has already read all the offset so its cursor is kind of already at the right place.
@@ -117,14 +141,6 @@ function decodeRecursive(reader: ForkedReader, paramTypes: ParamType[], baseOffs
                 // if the child was a tuple it would not work
                 // this ensures we recursive for sub types as well
                 return decodeRecursive(subReader, [currentParam.arrayChildren], field.offset)[0];
-                // return <FieldMetadata>{
-                //     isDynamic: false,
-                //     offset: field.offset + subReader.consumed,
-                //     type: currentParam.arrayChildren.format("full"),
-                //     size: 32,
-                //     value: hexlify(subReader.readBytes(WORD_SIZE)),
-                //     children: []
-                // };
               });
           }
         }

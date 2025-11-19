@@ -13,7 +13,7 @@ path = "bin/encode_blocks.rs"
 
 [dependencies]
 anyhow = "1.0"
-ccnext-abi-encoding = { version = "0.4.0" }
+ccnext-abi-encoding = { version = "0.5.0" }
 clap = { version = "4.5.52", features = ["derive"] }
 tokio = { version = "1.37.0", features = [
     "macros",

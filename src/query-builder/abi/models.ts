@@ -26,8 +26,18 @@ export enum QueryableFields {
   RxLogs = 'rxLogs',
 }
 
+export type Field = {
+  name: QueryableFields;
+  type: string;
+};
+
+export interface Chunk {
+  fields: Field[];
+}
+
 export interface MappedEncodedFields {
-  fields: { name: QueryableFields; type: string }[];
+  chunks: Chunk[]; // Explicit chunks - primary structure
+  fields?: Field[]; // Optional flat array for backward compatibility
 }
 
 export interface FieldMetadata {

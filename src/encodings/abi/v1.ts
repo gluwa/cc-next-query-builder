@@ -1,114 +1,112 @@
-import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, ZeroAddress, Authorization } from 'ethers';
+import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, Authorization } from 'ethers';
 import { addressOrZero } from '../utils';
-import { EncodedFields } from '../common';
+import { EncodingResult } from '..';
 
-function getFieldsForType0(tx: TransactionResponse): EncodedFields {
-  return {
-    types: [
-      'uint8',
-      'uint64',
-      'uint128',
-      'uint64',
-      'address',
-      'bool',
-      'address',
-      'uint256',
-      'bytes',
-      'uint256',
-      'bytes32',
-      'bytes32',
-    ],
-    values: [
-      tx.type,
-      tx.nonce,
-      tx.gasPrice,
-      tx.gasLimit,
-      tx.from,
-      tx.to == null,
-      addressOrZero(tx.to),
-      tx.value,
-      tx.data,
-      tx.signature.networkV ?? tx.signature.v,
-      tx.signature.r,
-      tx.signature.s,
-    ],
-  };
+/**
+ * Encodes common transaction fields that are shared across all transaction types
+ * Fields: nonce, gasLimit, from, toIsNull, to, value, data (7 fields)
+ */
+function encodeCommonFields(tx: TransactionResponse): string {
+  const coder = AbiCoder.defaultAbiCoder();
+  return coder.encode(
+    ['uint64', 'uint64', 'address', 'bool', 'address', 'uint256', 'bytes'],
+    [tx.nonce, tx.gasLimit, tx.from, tx.to == null, addressOrZero(tx.to), tx.value, tx.data],
+  );
 }
 
-function getFieldsForType1(tx: TransactionResponse): EncodedFields {
-  return {
-    types: [
-      'uint8',
-      'uint64',
-      'uint64',
-      'uint128',
-      'uint64',
-      'address',
-      'bool',
-      'address',
-      'uint256',
-      'bytes',
-      'tuple(address,bytes32[])[]',
-      'uint8',
-      'bytes32',
-      'bytes32',
-    ],
-    values: [
-      tx.type,
-      tx.chainId,
-      tx.nonce,
-      tx.gasPrice,
-      tx.gasLimit,
-      tx.from,
-      tx.to == null,
-      addressOrZero(tx.to),
-      tx.value,
-      tx.data,
-      encodeAccessList(tx.accessList),
-      tx.signature.yParity,
-      tx.signature.r,
-      tx.signature.s,
-    ],
-  };
+/**
+ * Encodes receipt fields that are identical across all transaction types
+ * Fields: receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom (4 fields)
+ */
+function encodeReceiptFields(rx: TransactionReceipt): string {
+  const coder = AbiCoder.defaultAbiCoder();
+
+  // For status field, default to 1 (success) if undefined (pre-EIP-658 receipts)
+  // See: https://eips.ethereum.org/EIPS/eip-658
+  return coder.encode(
+    ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
+    [rx.status ?? 1, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
+  );
 }
 
-function getFieldsForType2(tx: TransactionResponse): EncodedFields {
-  return {
-    types: [
-      'uint8',
-      'uint64',
-      'uint64',
-      'uint128',
-      'uint128',
-      'uint64',
-      'address',
-      'bool',
-      'address',
-      'uint256',
-      'bytes',
-      'tuple(address,bytes32[])[]',
-      'uint8',
-      'bytes32',
-      'bytes32',
-    ],
-    values: [
-      tx.type,
+/**
+ * Explicit chunk creation for Type 0 transaction (Legacy)
+ * Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+ * Chunk 2: Type-specific fields (gasPrice, v, r, s)
+ * Chunk 3: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+ */
+function getChunksForType0(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+  const coder = AbiCoder.defaultAbiCoder();
+
+  // Chunk 1: Common fields
+  const chunk1 = encodeCommonFields(tx);
+
+  // Chunk 2: Type-specific fields (gasPrice, v, r, s)
+  const chunk2 = coder.encode(
+    ['uint128', 'uint256', 'bytes32', 'bytes32'],
+    [tx.gasPrice, tx.signature.networkV ?? tx.signature.v, tx.signature.r, tx.signature.s],
+  );
+
+  // Chunk 3: Receipt fields
+  const chunk3 = encodeReceiptFields(rx);
+
+  return [chunk1, chunk2, chunk3];
+}
+
+/**
+ * Explicit chunk creation for Type 1 transaction (Access List)
+ * Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+ * Chunk 2: Type-specific fields (chainId, gasPrice, accessList, yParity, r, s)
+ * Chunk 3: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+ */
+function getChunksForType1(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+  const coder = AbiCoder.defaultAbiCoder();
+
+  // Chunk 1: Common fields
+  const chunk1 = encodeCommonFields(tx);
+
+  // Chunk 2: Type-specific fields (chainId, gasPrice, accessList, yParity, r, s)
+  const chunk2 = coder.encode(
+    ['uint64', 'uint128', 'tuple(address,bytes32[])[]', 'uint8', 'bytes32', 'bytes32'],
+    [tx.chainId, tx.gasPrice, encodeAccessList(tx.accessList), tx.signature.yParity, tx.signature.r, tx.signature.s],
+  );
+
+  // Chunk 3: Receipt fields
+  const chunk3 = encodeReceiptFields(rx);
+
+  return [chunk1, chunk2, chunk3];
+}
+
+/**
+ * Explicit chunk creation for Type 2 transaction (EIP-1559)
+ * Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+ * Chunk 2: Type-specific fields (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList, yParity, r, s)
+ * Chunk 3: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+ */
+function getChunksForType2(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+  const coder = AbiCoder.defaultAbiCoder();
+
+  // Chunk 1: Common fields
+  const chunk1 = encodeCommonFields(tx);
+
+  // Chunk 2: Type-specific fields (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList, yParity, r, s)
+  const chunk2 = coder.encode(
+    ['uint64', 'uint128', 'uint128', 'tuple(address,bytes32[])[]', 'uint8', 'bytes32', 'bytes32'],
+    [
       tx.chainId,
-      tx.nonce,
       tx.maxPriorityFeePerGas,
       tx.maxFeePerGas,
-      tx.gasLimit,
-      tx.from,
-      tx.to == null,
-      addressOrZero(tx.to),
-      tx.value,
-      tx.data,
       encodeAccessList(tx.accessList),
       tx.signature.yParity,
       tx.signature.r,
       tx.signature.s,
     ],
-  };
+  );
+
+  // Chunk 3: Receipt fields
+  const chunk3 = encodeReceiptFields(rx);
+
+  return [chunk1, chunk2, chunk3];
 }
 
 function encodeAccessList(accessList: AccessList | null) {
@@ -117,49 +115,35 @@ function encodeAccessList(accessList: AccessList | null) {
   return accessList.map((entry) => [entry.address, entry.storageKeys]);
 }
 
-function getFieldsForType3(tx: TransactionResponse): EncodedFields {
-  const out = {
-    types: [
-      'uint8',
-      'uint64',
-      'uint64',
-      'uint128',
-      'uint128',
-      'uint64',
-      'address',
-      'bool',
-      'address',
-      'uint256',
-      'bytes',
-      'tuple(address,uint256[])[]',
-      'uint256',
-      'bytes32[]',
-      'uint8',
-      'bytes32',
-      'bytes32',
-    ],
-    values: [
-      tx.type,
-      tx.chainId,
-      tx.nonce,
-      tx.maxPriorityFeePerGas,
-      tx.maxFeePerGas,
-      tx.gasLimit,
-      tx.from,
-      tx.to == null,
-      addressOrZero(tx.to),
-      tx.value,
-      tx.data,
-      encodeAccessList(tx.accessList),
-      tx.maxFeePerBlobGas,
-      tx.blobVersionedHashes,
-      tx.signature.yParity,
-      tx.signature.r,
-      tx.signature.s,
-    ],
-  };
+/**
+ * Explicit chunk creation for Type 3 transaction (Chunk)
+ * Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+ * Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
+ * Chunk 3: Type-specific fields part 2 (maxFeePerChunkGas, blobVersionedHashes, yParity, r, s)
+ * Chunk 4: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+ */
+function getChunksForType3(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+  const coder = AbiCoder.defaultAbiCoder();
 
-  return out;
+  // Chunk 1: Common fields
+  const chunk1 = encodeCommonFields(tx);
+
+  // Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
+  const chunk2 = coder.encode(
+    ['uint64', 'uint128', 'uint128', 'tuple(address,bytes32[])[]'],
+    [tx.chainId, tx.maxPriorityFeePerGas, tx.maxFeePerGas, encodeAccessList(tx.accessList)],
+  );
+
+  // Chunk 3: Type-specific fields part 2 (maxFeePerChunkGas, blobVersionedHashes, yParity, r, s)
+  const chunk3 = coder.encode(
+    ['uint256', 'bytes32[]', 'uint8', 'bytes32', 'bytes32'],
+    [tx.maxFeePerBlobGas, tx.blobVersionedHashes, tx.signature.yParity, tx.signature.r, tx.signature.s],
+  );
+
+  // Chunk 4: Receipt fields
+  const chunk4 = encodeReceiptFields(rx);
+
+  return [chunk1, chunk2, chunk3, chunk4];
 }
 
 function encodeAuthorizationList(authorizationList: Array<Authorization> | null) {
@@ -175,90 +159,215 @@ function encodeAuthorizationList(authorizationList: Array<Authorization> | null)
   ]);
 }
 
-function getFieldsForType4(tx: TransactionResponse): EncodedFields {
-  const out = {
-    types: [
-      'uint8',
-      'uint64',
-      'uint64',
-      'uint128',
-      'uint128',
-      'uint64',
-      'address',
-      'bool',
-      'address',
-      'uint256',
-      'bytes',
-      'tuple(address,uint256[])[]',
-      'tuple(uint256,address,uint64,uint8,uint256,uint256)[]',
-      'uint8',
-      'bytes32',
-      'bytes32',
-    ],
-    values: [
-      tx.type,
-      tx.chainId,
-      tx.nonce,
-      tx.maxPriorityFeePerGas,
-      tx.maxFeePerGas,
-      tx.gasLimit,
-      tx.from,
-      tx.to == null,
-      addressOrZero(tx.to),
-      tx.value,
-      tx.data,
-      encodeAccessList(tx.accessList),
-      encodeAuthorizationList(tx.authorizationList),
-      tx.signature.yParity,
-      tx.signature.r,
-      tx.signature.s,
-    ],
-  };
+/**
+ * Explicit chunk creation for Type 4 transaction (Authorization)
+ * Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+ * Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
+ * Chunk 3: Type-specific fields part 2 (authorizationList, yParity, r, s)
+ * Chunk 4: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+ */
+function getChunksForType4(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+  const coder = AbiCoder.defaultAbiCoder();
 
-  return out;
+  // Chunk 1: Common fields
+  const chunk1 = encodeCommonFields(tx);
+
+  // Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
+  const chunk2 = coder.encode(
+    ['uint64', 'uint128', 'uint128', 'tuple(address,bytes32[])[]'],
+    [tx.chainId, tx.maxPriorityFeePerGas, tx.maxFeePerGas, encodeAccessList(tx.accessList)],
+  );
+
+  // Chunk 3: Type-specific fields part 2 (authorizationList, yParity, r, s)
+  const chunk3 = coder.encode(
+    ['tuple(uint256,address,uint64,uint8,uint256,uint256)[]', 'uint8', 'bytes32', 'bytes32'],
+    [encodeAuthorizationList(tx.authorizationList), tx.signature.yParity, tx.signature.r, tx.signature.s],
+  );
+
+  // Chunk 4: Receipt fields
+  const chunk4 = encodeReceiptFields(rx);
+
+  return [chunk1, chunk2, chunk3, chunk4];
 }
 
-function getFieldsForType(tx: TransactionResponse): EncodedFields {
-  switch (tx.type) {
+function getTypesForType(txType: number): string[] {
+  switch (txType) {
     case 0:
-      return getFieldsForType0(tx);
+      // Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+      // Chunk 2: Type-specific fields (gasPrice, v, r, s)
+      // Chunk 3: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+      return [
+        'uint64',
+        'uint64',
+        'address',
+        'bool',
+        'address',
+        'uint256',
+        'bytes',
+        'uint128',
+        'uint256',
+        'bytes32',
+        'bytes32',
+        'uint8',
+        'uint64',
+        'tuple(address, bytes32[], bytes)[]',
+        'bytes',
+      ];
     case 1:
-      return getFieldsForType1(tx);
+      // Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+      // Chunk 2: Type-specific fields (chainId, gasPrice, accessList, yParity, r, s)
+      // Chunk 3: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+      return [
+        'uint64',
+        'uint64',
+        'address',
+        'bool',
+        'address',
+        'uint256',
+        'bytes',
+        'uint64',
+        'uint128',
+        'tuple(address,bytes32[])[]',
+        'uint8',
+        'bytes32',
+        'bytes32',
+        'uint8',
+        'uint64',
+        'tuple(address, bytes32[], bytes)[]',
+        'bytes',
+      ];
     case 2:
-      return getFieldsForType2(tx);
+      // Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+      // Chunk 2: Type-specific fields (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList, yParity, r, s)
+      // Chunk 3: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+      return [
+        'uint64',
+        'uint64',
+        'address',
+        'bool',
+        'address',
+        'uint256',
+        'bytes',
+        'uint64',
+        'uint128',
+        'uint128',
+        'tuple(address,bytes32[])[]',
+        'uint8',
+        'bytes32',
+        'bytes32',
+        'uint8',
+        'uint64',
+        'tuple(address, bytes32[], bytes)[]',
+        'bytes',
+      ];
     case 3:
-      return getFieldsForType3(tx);
+      // Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+      // Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
+      // Chunk 3: Type-specific fields part 2 (maxFeePerChunkGas, blobVersionedHashes, yParity, r, s)
+      // Chunk 4: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+      return [
+        'uint64',
+        'uint64',
+        'address',
+        'bool',
+        'address',
+        'uint256',
+        'bytes',
+        'uint64',
+        'uint128',
+        'uint128',
+        'tuple(address,bytes32[])[]',
+        'uint256',
+        'bytes32[]',
+        'uint8',
+        'bytes32',
+        'bytes32',
+        'uint8',
+        'uint64',
+        'tuple(address, bytes32[], bytes)[]',
+        'bytes',
+      ];
     case 4:
-      return getFieldsForType4(tx);
+      // Chunk 1: Common fields (nonce, gasLimit, from, toIsNull, to, value, data)
+      // Chunk 2: Type-specific fields part 1 (chainId, maxPriorityFeePerGas, maxFeePerGas, accessList)
+      // Chunk 3: Type-specific fields part 2 (authorizationList, yParity, r, s)
+      // Chunk 4: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
+      return [
+        'uint64',
+        'uint64',
+        'address',
+        'bool',
+        'address',
+        'uint256',
+        'bytes',
+        'uint64',
+        'uint128',
+        'uint128',
+        'tuple(address,bytes32[])[]',
+        'tuple(uint256,address,uint64,uint8,uint256,uint256)[]',
+        'uint8',
+        'bytes32',
+        'bytes32',
+        'uint8',
+        'uint64',
+        'tuple(address, bytes32[], bytes)[]',
+        'bytes',
+      ];
     default:
-      throw new Error('Unsupported transaction type');
+      throw new Error(`Unsupported transaction type: ${txType}`);
   }
 }
 
-function getReceiptFields(rx: TransactionReceipt): EncodedFields {
-  return {
-    types: ['uint8', 'uint64', 'tuple(address, bytes32[], bytes)[]', 'bytes'],
-    values: [rx.status ?? 1, rx.gasUsed, rx.logs.map((log) => [log.address, log.topics, log.data]), rx.logsBloom],
-  };
+/**
+ * Selects the appropriate chunk creation function based on transaction type
+ */
+function getChunksForType(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+  switch (tx.type) {
+    case 0:
+      return getChunksForType0(tx, rx);
+    case 1:
+      return getChunksForType1(tx, rx);
+    case 2:
+      return getChunksForType2(tx, rx);
+    case 3:
+      return getChunksForType3(tx, rx);
+    case 4:
+      return getChunksForType4(tx, rx);
+    default:
+      throw new Error(`Unsupported transaction type: ${tx.type}`);
+  }
 }
 
-function getAllFields(tx: TransactionResponse, rx: TransactionReceipt): EncodedFields {
-  const txFields = getFieldsForType(tx);
-  const receiptFields = getReceiptFields(rx);
-  const allFieldTypes = [...txFields.types, ...receiptFields.types];
-  const allFieldValues = [...txFields.values, ...receiptFields.values];
+/**
+ * Encodes transaction and receipt data into ABI-encoded bytes[] format
+ *
+ * The output `abi` string is raw ABI-encoded data (not a function call).
+ * To decode it:
+ * - Type: `bytes[]`
+ * - Data: the `abi` string (make sure it has 0x prefix if required by decoder)
+ *
+ * Note: Some online decoders may have issues with raw ABI-encoded bytes[] arrays.
+ * For programmatic decoding, see the investigation utilities in investigate.ts.
+ *
+ * @param tx - Transaction response
+ * @param rx - Transaction receipt
+ * @returns Object containing the encoded abi string and the types array
+ */
+export function abiEncode(tx: TransactionResponse, rx: TransactionReceipt): EncodingResult {
+  // Create chunks using explicit chunk creation (super explicit - no intermediate steps)
+  const chunks = getChunksForType(tx, rx);
+
+  // Build flat types array from chunk configuration for QueryBuilder compatibility
+  const types = getTypesForType(tx.type);
+
+  // Encode as (uint8, bytes[]) where uint8 is the transaction type
+  // This makes it easy to extract the type without full decoding
+  // QueryBuilder needs to understand this structure to calculate offsets
+  const coder = AbiCoder.defaultAbiCoder();
+  const abi = coder.encode(['uint8', 'bytes[]'], [tx.type, chunks]);
 
   return {
-    types: allFieldTypes,
-    values: allFieldValues,
-  };
-}
-
-export function abiEncode(tx: TransactionResponse, rx: TransactionReceipt) {
-  const allFields = getAllFields(tx, rx);
-  const abi = AbiCoder.defaultAbiCoder().encode(allFields.types, allFields.values);
-  return {
-    types: allFields.types,
-    abi,
+    types, // Flat types for QueryBuilder to understand field grouping
+    abi, // (uint8, bytes[]) format - this is what gets stored and attested to
   };
 }

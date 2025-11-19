@@ -1,6 +1,5 @@
 import { assert, BytesLike, defineProperties, getBytesCopy, hexlify, toBigInt, toNumber } from 'ethers';
-
-const WordSize: number = 32;
+import { WORD_SIZE } from '../abi/abi-utils';
 
 export class ForkedReader {
   // Allows incomplete unpadded data to be read; otherwise an error
@@ -72,7 +71,7 @@ export class ForkedReader {
   }
 
   #peekBytes(offset: number, length: number, loose?: boolean): Uint8Array {
-    let alignedLength = Math.ceil(length / WordSize) * WordSize;
+    let alignedLength = Math.ceil(length / WORD_SIZE) * WORD_SIZE;
     if (this.#offset + alignedLength > this.#data.length) {
       if (this.allowLoose && loose && this.#offset + length <= this.#data.length) {
         alignedLength = length;
@@ -118,10 +117,10 @@ export class ForkedReader {
 
   // Read a numeric values
   readValue(): bigint {
-    return toBigInt(this.readBytes(WordSize));
+    return toBigInt(this.readBytes(WORD_SIZE));
   }
 
   readIndex(): number {
-    return toNumber(this.readBytes(WordSize));
+    return toNumber(this.readBytes(WORD_SIZE));
   }
 }
