@@ -23,7 +23,11 @@ jobs:
   setup:
     runs-on: ubuntu-24.04
     outputs:
+      # vvv how long to keep encoding blocks
       timeout-minutes: ${{ steps.cron-env.outputs.timeout-minutes || 3 }}
+      step-timeout: ${{ steps.cron-env.outputs.step-timeout || 5 }}
+      # ^^^ how long to wait for the encoding-blocks program to exit
+      # WARNING: must be greater than the value of `timeout-minutes`
 
     steps:
       - name: Cron ENV
@@ -32,6 +36,7 @@ jobs:
         run: |
           # shellcheck disable=SC2129
           echo "timeout-minutes=60" >> "$GITHUB_OUTPUT"
+          echo "step-timeout=62" >> "$GITHUB_OUTPUT"
 
   alloy-encode:
     needs:
@@ -61,6 +66,7 @@ jobs:
           cargo build --release
 
       - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
+        timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         working-directory: rust
         run: |
           ./target/release/encode-blocks \
@@ -93,6 +99,7 @@ jobs:
       - run: npm run build --if-present
 
       - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
+        timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         run: |
           node dist/bin/encode-blocks.js \
             https://blockchain.googleapis.com/v1/projects/usc-integration-test/locations/asia-east1/endpoints/ethereum-sepolia/rpc?key=${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }} \
