@@ -76,11 +76,20 @@ jobs:
             TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
       - name: Add notices in case of failure
-        if: failure()
+        if: failure() && github.event_name == 'pull_request'
         run: |
           # note: GitHub appears to display these in reverse order
           echo "::notice::SUGGESTION: Trigger this workflow manually against the same branch to verify the changes."
           echo "::notice::IMPORTANT:  Secret credentials may be missing for PRs from Dependabot!"
+
+      - name: Report result to Slack
+        if: failure() && github.event_name == 'schedule'
+        uses: act10ns/slack@v2
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          channel: "#protocol-internal"
+          message: "Alloy encode failed! cc <@U028EMRHS3S>"
 
       - name: Upload encoded data
         if: always()
@@ -115,11 +124,20 @@ jobs:
             TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
       - name: Add notices in case of failure
-        if: failure()
+        if: failure() && github.event_name == 'pull_request'
         run: |
           # note: GitHub appears to display these in reverse order
           echo "::notice::SUGGESTION: Trigger this workflow manually against the same branch to verify the changes."
           echo "::notice::IMPORTANT:  Secret credentials may be missing for PRs from Dependabot!"
+
+      - name: Report result to Slack
+        if: failure() && github.event_name == 'schedule'
+        uses: act10ns/slack@v2
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          channel: "#protocol-internal"
+          message: "Ethers encode failed! cc <@U028EMRHS3S>"
 
       - name: Upload encoded data
         if: always()
