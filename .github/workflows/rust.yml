@@ -1,7 +1,7 @@
 ---
 name: rust
 
-"on":
+'on':
   pull_request:
     paths:
       - '**.rs'
