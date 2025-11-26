@@ -1,7 +1,7 @@
 ---
 name: compare-encoding
 
-"on":
+'on':
   pull_request:
     paths:
       - '**.rs'
@@ -10,7 +10,7 @@ name: compare-encoding
       - '**package*.json'
       - '.github/workflows/compare-encoding.yml'
   schedule:
-    - cron: "12 */12 * * *"
+    - cron: '12 */12 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -73,7 +73,7 @@ jobs:
             --eth-rpc-url wss://blockchain.googleapis.com/v1/projects/usc-integration-test/locations/asia-east1/endpoints/ethereum-sepolia/rpc?key=${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }} \
             --path-to-store-json /var/tmp/encoded-data/alloy/
         env:
-            TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
+          TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
       - name: Add notices in case of failure
         if: failure() && github.event_name == 'pull_request'
@@ -88,8 +88,8 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-          channel: "#protocol-internal"
-          message: "Alloy encode failed! cc <@U028EMRHS3S>"
+          channel: '#protocol-internal'
+          message: 'Alloy encode failed! cc <@U028EMRHS3S>'
 
       - name: Upload encoded data
         if: always()
@@ -121,7 +121,7 @@ jobs:
             https://blockchain.googleapis.com/v1/projects/usc-integration-test/locations/asia-east1/endpoints/ethereum-sepolia/rpc?key=${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }} \
             /var/tmp/encoded-data/ethers/
         env:
-            TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
+          TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
       - name: Add notices in case of failure
         if: failure() && github.event_name == 'pull_request'
@@ -136,8 +136,8 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-          channel: "#protocol-internal"
-          message: "Ethers encode failed! cc <@U028EMRHS3S>"
+          channel: '#protocol-internal'
+          message: 'Ethers encode failed! cc <@U028EMRHS3S>'
 
       - name: Upload encoded data
         if: always()
@@ -204,5 +204,5 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-          channel: "#protocol-internal"
-          message: "Encoding diff complete! cc <@U028EMRHS3S>"
+          channel: '#protocol-internal'
+          message: 'Encoding diff complete! cc <@U028EMRHS3S>'
