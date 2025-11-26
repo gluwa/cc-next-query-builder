@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { Block, JsonRpcProvider, TransactionReceipt } from 'ethers';
+import { Block, WebSocketProvider, TransactionReceipt } from 'ethers';
 import { abiEncode } from '../encodings/abi';
 
 /**
@@ -10,7 +10,7 @@ import { abiEncode } from '../encodings/abi';
  * @param block - The block to get receipts for
  * @returns Array of transaction receipts for the block
  */
-async function getBlockReceipts(rpc: JsonRpcProvider, block: Block): Promise<TransactionReceipt[]> {
+async function getBlockReceipts(rpc: WebSocketProvider, block: Block): Promise<TransactionReceipt[]> {
   // Regular Infura/compatible RPC takes block number as hexadecimal string
   const finalBlockNumber = `0x${block.number.toString(16)}`;
 
@@ -28,7 +28,7 @@ async function getBlockReceipts(rpc: JsonRpcProvider, block: Block): Promise<Tra
 
 // cost 80 or 160 credits depnding on arguments
 async function encodeTransaction(
-  provider: JsonRpcProvider,
+  provider: WebSocketProvider,
   txHash: string,
   receipt: TransactionReceipt | null,
 ): Promise<string> {
@@ -45,7 +45,7 @@ async function encodeTransaction(
 
 async function encodeAndWriteToDisk(
   pathToStoreJson: string,
-  provider: JsonRpcProvider,
+  provider: WebSocketProvider,
   blockNumber: number,
   txHash: string,
   receipt: TransactionReceipt | null,
@@ -61,7 +61,7 @@ async function encodeAndWriteToDisk(
 // cost: (80 + 160 * <txns in block>)
 async function blockHandler(
   prefix: string,
-  provider: JsonRpcProvider,
+  provider: WebSocketProvider,
   blockNumber: number,
   pathToStoreJson: string,
 ): Promise<void> {
@@ -101,7 +101,7 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
 
   mkdirSync(pathToStoreJson, { recursive: true });
 
-  const provider = new JsonRpcProvider(rpcUrl);
+  const provider = new WebSocketProvider(rpcUrl);
 
   // Fire the event whenever the block changes.
   // We can also fire on 'safe' or 'finalized' blocks
@@ -117,11 +117,11 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
 }
 
 if (process.argv.length < 4) {
-  console.error('node dist/bin/encode-blocks.js <ethRpcUrl> <pathToStoreJson>');
+  console.error('node dist/bin/encode-blocks.js <ws://ethRpcUrl> <pathToStoreJson>');
   process.exit(1);
 }
 
-const rpcUrl = process.argv[2] || 'http://127.0.0.1:8545';
+const rpcUrl = process.argv[2] || 'ws://127.0.0.1:8545';
 const pathToStoreJson = process.argv[3];
 
 encodeBlocks(rpcUrl, pathToStoreJson).catch((reason) => {
