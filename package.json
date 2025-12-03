@@ -30,7 +30,8 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "@polkadot/api": "16.5.2",
+    "axios": "^1.13.2",
+    "@polkadot/api": "^16.5.2",
     "dotenv": "^17.2.3",
     "ethers": "^6.15.0"
   },
