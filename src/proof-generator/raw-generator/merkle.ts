@@ -30,13 +30,13 @@ function hashLeaf(leaf: string): string {
 /**
  * Constant zero hash (32 bytes of zero) used in Merkle tree calculations
  */
-const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
+export const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 /**
  * Zero leaf hash: hashLeaf of zero bytes32
  * Used as padding when there's an odd number of leaves to prevent phantom transactions
  */
-const ZERO_LEAF = hashLeaf(ZERO_HASH);
+export const ZERO_LEAF = hashLeaf(ZERO_HASH);
 
 /**
  * Computes the Merkle root of a block's transactions using Keccak-256 hashing.
@@ -161,6 +161,11 @@ export class KeccakMerkleTree {
   }
 
   public generateProof(leafIndex: number): TransactionMerkleProof {
+    // Check if tree is empty
+    if (this.levels.length === 0) {
+      throw new Error('Cannot generate proof from empty tree');
+    }
+
     // Check if index is out of range
     const leafCount = this.levels[0]?.length || 0;
     if (leafIndex >= leafCount) {

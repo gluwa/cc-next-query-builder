@@ -1,5 +1,5 @@
-export { RawProofGenerator } from './raw-generator';
-export { ProverAPIProofGenerator } from './api-generator';
+export * as raw from './raw-generator';
+export * as api from './api-generator';
 
 export interface ContinuityBlock {
   merkleRoot: string;
@@ -40,14 +40,18 @@ export interface ContinuityResponse {
   headerNumber: number;
   txIndex: number;
   txHash: string;
+  txBytes: string;
   continuityProof: ContinuityProof;
   merkleProof: TransactionMerkleProof;
-  merkleRoot: string;
   cached: boolean;
   generatedAt: Date;
 }
 
-export type ProofGenerationResult = { success: true; data: ContinuityResponse } | { success: false; error: string };
+export interface ProofGenerationResult {
+  success: boolean;
+  data?: ContinuityResponse;
+  error?: string;
+}
 
 export interface ProofGenerator {
   generateProof(transactionHash: string): Promise<ProofGenerationResult>;

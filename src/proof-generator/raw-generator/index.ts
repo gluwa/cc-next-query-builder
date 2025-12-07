@@ -1,13 +1,16 @@
-import { ApiPromise } from '@polkadot/api';
-import { JsonRpcProvider } from 'ethers';
-
 import { ProofGenerationResult, ProofGenerator } from '..';
 
 import { abiEncode, EncodingVersion } from '../../encodings';
 
 import { ContinuityProofBuilder } from './continuity-proof';
-import { getBlockAndReceiptsWithCache } from './block-cache';
 import { KeccakMerkleTree } from './merkle';
+import { BlockProvider } from './block-provider';
+import { ContinuityProvider } from './continuity-provider';
+
+// Re-export for easier access
+export * as blockProvider from './block-provider';
+export * as continuityProvider from './continuity-provider';
+export { EncodingVersion } from '../../encodings';
 
 /**
  * RawProofGenerator generates raw proofs for a given transaction.
@@ -17,23 +20,28 @@ import { KeccakMerkleTree } from './merkle';
  * The generator constructs Merkle proofs for transactions and continuity proofs for blocks.
  */
 export class RawProofGenerator implements ProofGenerator {
-  private ethProvider: JsonRpcProvider;
-  private ccProvider: ApiPromise;
+  private blockProvider: BlockProvider;
+  private continuityProvider: ContinuityProvider;
 
   private chainKey: number;
   private builder: ContinuityProofBuilder;
 
-  constructor(chainKey: number, provider: JsonRpcProvider, ccProvider: ApiPromise, encoding: EncodingVersion) {
-    this.ethProvider = provider;
-    this.ccProvider = ccProvider;
+  constructor(
+    chainKey: number,
+    blockProvider: BlockProvider,
+    continuityProvider: ContinuityProvider,
+    encoding: EncodingVersion,
+  ) {
+    this.blockProvider = blockProvider;
+    this.continuityProvider = continuityProvider;
 
     this.chainKey = chainKey;
-    this.builder = new ContinuityProofBuilder(this.ethProvider, this.ccProvider, chainKey, encoding);
+    this.builder = new ContinuityProofBuilder(this.blockProvider, this.continuityProvider, chainKey, encoding);
   }
 
   public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
     // First we need to create merkle proof for the transaction block
-    const tx = await this.ethProvider.getTransaction(transactionHash);
+    const tx = await this.blockProvider.getTransaction(transactionHash);
     if (!tx) {
       return { success: false, error: `Transaction ${transactionHash} not found` };
     }
@@ -49,7 +57,7 @@ export class RawProofGenerator implements ProofGenerator {
 
     console.log(`Transaction found in block ${blockNumber}: ${blockHash} at index ${txIndex}`);
 
-    const { block, receipts } = await getBlockAndReceiptsWithCache(this.ethProvider, blockNumber);
+    const { block, receipts } = await this.blockProvider.getBlockWithReceipts(blockNumber);
     if (!block) {
       return { success: false, error: `Block ${blockNumber} not found for transaction ${transactionHash}` };
     }
@@ -94,9 +102,9 @@ export class RawProofGenerator implements ProofGenerator {
           headerNumber: blockNumber,
           txIndex,
           txHash: transactionHash,
+          txBytes: encodedTx[txIndex],
           continuityProof,
           merkleProof,
-          merkleRoot: merkleProof.root,
           cached: false,
           generatedAt: new Date(),
         },
