@@ -58,8 +58,13 @@ export function computeMerkleRootOfBlock(
   const leaves = block.prefetchedTransactions.map((transaction: TransactionResponse, index: number) => {
     const receipt = receipts[index];
     const result = abiEncode(transaction, receipt, encoding);
-    const encodedLeaf = result.abi;
-    return encodedLeaf;
+
+    // Block number 8 bytes BE
+    // Index 8 bytes BE
+    // ABI encoded transaction + receipt
+    const encodedData = solidityPacked(['uint64', 'uint64', 'bytes'], [block.number, transaction.index, result.abi]);
+
+    return encodedData;
   });
 
   // If the block has no transactions, return the default hash

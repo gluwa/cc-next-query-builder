@@ -1,3 +1,5 @@
+import { solidityPacked } from 'ethers';
+
 import { ProofGenerationResult, ProofGenerator } from '..';
 
 import { abiEncode, EncodingVersion } from '../../encodings';
@@ -83,8 +85,13 @@ export class RawProofGenerator implements ProofGenerator {
     // We can now ABI encode all transactions in the block
     // which will be the leaves of the merkle tree
     const encodedTx = orderedTransactions.map((txData, idx) => {
+      // Block number 8 bytes BE
+      // Index 8 bytes BE
+      // ABI encoded transaction + receipt
       const abi = abiEncode(txData, orderedReceipts[idx], EncodingVersion.V1);
-      return abi.abi;
+      const encodedData = solidityPacked(['uint64', 'uint64', 'bytes'], [blockNumber, txData.index, abi.abi]);
+
+      return encodedData;
     });
 
     // We can now build the merkle tree and proof
@@ -100,11 +107,11 @@ export class RawProofGenerator implements ProofGenerator {
         data: {
           chainKey: this.chainKey,
           headerNumber: blockNumber,
-          txIndex,
+          txIndex: txIndex,
           txHash: transactionHash,
           txBytes: encodedTx[txIndex],
-          continuityProof,
-          merkleProof,
+          continuityProof: continuityProof,
+          merkleProof: merkleProof,
           cached: false,
           generatedAt: new Date(),
         },

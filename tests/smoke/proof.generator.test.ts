@@ -113,7 +113,10 @@ test('ProofGenerator works with mock block provider', async () => {
 
   const proofResult = await gen.generateProof('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
 
-  console.log(proofResult);
+  expect(proofResult.success).toBe(false);
+  expect(proofResult.error).toBe(
+    'Transaction 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 not found',
+  );
 });
 
 test.skip('E2E ProofGenerator integration test', async () => {
@@ -123,45 +126,53 @@ test.skip('E2E ProofGenerator integration test', async () => {
   const ethProvider = new JsonRpcProvider(anvilRpc);
   const blockProvider = new proof.raw.blockProvider.SimpleBlockProvider(ethProvider);
 
+  // Continuity provider using precompile contract
   const ccRpc = 'http://localhost:9944';
   const ccProvider = new JsonRpcProvider(ccRpc);
   const alith = new Wallet(privateKey, ccProvider);
   const continuityProvider = new proof.raw.continuityProvider.PrecompileContinuityProvider(alith);
 
-  // Replace with your test chain key
+  // Block prover contract
+  const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
+  const contractABI = BlockProverABI as unknown as InterfaceAbi;
+  const blockProverContract = new Contract(blockProverContractAddress, contractABI, alith);
+
+  // NOTE: Replace with your test chain key
   const chainKey = 2;
 
-  const proofGenerator = new proof.raw.RawProofGenerator(
+  // NOTE: Replace with a valid transaction hash from your Anvil instance
+  const transactionHash = '0x419f79244ee982c48feda702edd2329cd1c5aa25d849023e031665a82c7053ff';
+
+  // First we test with the raw proof generator
+  const rawProofGenerator = new proof.raw.RawProofGenerator(
     chainKey,
     blockProvider,
     continuityProvider,
     EncodingVersion.V1,
   );
+  const rawProofResult = await rawProofGenerator.generateProof(transactionHash);
+  expect(rawProofResult.success).toBe(true);
 
-  // Replace with a valid transaction hash from your Anvil instance
-  const transactionHash = '0x4368272fe05db391947648005962f7acb2e57800c427e309b6d439d90beb7db8';
-  const proofResult = await proofGenerator.generateProof(transactionHash);
-
-  if (!proofResult.success) {
-    console.error('Proof generation failed:', proofResult.error);
-    return;
-  }
-
-  const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
-  const contractABI = BlockProverABI as unknown as InterfaceAbi;
-  const blockContract = new Contract(blockProverContractAddress, contractABI, alith);
-
-  const proofData = proofResult.data!;
-
-  console.log(proofData.continuityProof);
-
-  const proveResult = await blockContract.verify(
+  const proofData = rawProofResult.data!;
+  const proveResultRaw = await blockProverContract.verify(
     proofData.chainKey,
     proofData.headerNumber,
     proofData.txBytes,
     proofData.merkleProof,
     proofData.continuityProof,
   );
+  expect(proveResultRaw).toBe(true);
 
-  console.log('Proving results:', proveResult);
+  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, 'http://localhost:3100', 5000);
+  const apiProofResult = await apiProvider.generateProof(transactionHash);
+  const apiProofData = apiProofResult.data!;
+
+  const proveResultApi = await blockProverContract.verify(
+    apiProofData.chainKey,
+    apiProofData.headerNumber,
+    apiProofData.txBytes,
+    apiProofData.merkleProof,
+    apiProofData.continuityProof,
+  );
+  expect(proveResultApi).toBe(true);
 });
