@@ -22,10 +22,6 @@ export interface ContinuityProvider {
  * Default address for the ChainInfo precompile contract
  */
 export const PRECOMPILE_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000fd3';
-
-export const DEFAULT_GAS_PRICE = 10000000;
-export const DEFAULT_GAS_LIMIT = 10000000;
-
 interface AttestationBounds {
   parentHeight: bigint;
   parentHash: string;
@@ -40,28 +36,14 @@ export class PrecompileContinuityProvider implements ContinuityProvider {
   private wallet: Wallet;
   private chainInfoContract: Contract;
 
-  private gasPrice: number;
-  private gasLimit: number;
-
-  constructor(
-    wallet: Wallet,
-    precompileAddress: string = PRECOMPILE_CONTRACT_ADDRESS,
-    gasPrice: number = DEFAULT_GAS_PRICE,
-    gasLimit: number = DEFAULT_GAS_LIMIT,
-  ) {
+  constructor(wallet: Wallet, precompileAddress: string = PRECOMPILE_CONTRACT_ADDRESS) {
     this.wallet = wallet;
     this.chainInfoContract = new Contract(precompileAddress, contractABI, this.wallet);
-
-    this.gasPrice = gasPrice;
-    this.gasLimit = gasLimit;
   }
 
   public async getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds> {
     try {
-      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height, {
-        gasPrice: this.gasPrice,
-        gasLimit: this.gasLimit,
-      });
+      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height);
 
       const attBounds = bounds as AttestationBounds;
 
