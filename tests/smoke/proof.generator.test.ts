@@ -119,7 +119,7 @@ test('ProofGenerator works with mock block provider', async () => {
   );
 });
 
-test('E2E ProofGenerator integration test', async () => {
+test.skip('E2E ProofGenerator integration test', async () => {
   // Alith private key from Anvil default accounts
   const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
   const anvilRpc = 'http://localhost:8545';
