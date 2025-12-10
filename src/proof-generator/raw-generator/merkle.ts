@@ -33,12 +33,6 @@ function hashLeaf(leaf: string): string {
 export const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 /**
- * Zero leaf hash: hashLeaf of zero bytes32
- * Used as padding when there's an odd number of leaves to prevent phantom transactions
- */
-export const ZERO_LEAF = hashLeaf(ZERO_HASH);
-
-/**
  * Computes the Merkle root of a block's transactions using Keccak-256 hashing.
  *
  * The block **must have prefetchedTransactions populated**. And the receipts **must correspond
@@ -77,31 +71,9 @@ export function computeMerkleRootOfBlock(
     return hashLeaf(leaves[0]);
   }
 
-  // Hash all leaves first using leaf prefix
-  let currentLevel = leaves.map((leaf) => hashLeaf(leaf));
-
-  // Build tree level by level until we have a single root
-  while (currentLevel.length > 1) {
-    const nextLevel: string[] = [];
-
-    // Process pairs using inner node prefix
-    for (let i = 0; i < currentLevel.length; i += 2) {
-      if (i + 1 < currentLevel.length) {
-        // Pair: hashInner(left, right)
-        const pairHash = hashInner(currentLevel[i], currentLevel[i + 1]);
-        nextLevel.push(pairHash);
-      } else {
-        // Odd number of nodes: use zero leaf instead of duplicating (prevents phantom transactions)
-        const pairHash = hashInner(currentLevel[i], ZERO_LEAF);
-        nextLevel.push(pairHash);
-      }
-    }
-
-    currentLevel = nextLevel;
-  }
-
-  // The single remaining hash is the Merkle root
-  return currentLevel[0];
+  // Multiple leaves: build the Merkle tree
+  const tree = new KeccakMerkleTree(leaves);
+  return tree.getRoot();
 }
 
 /**
