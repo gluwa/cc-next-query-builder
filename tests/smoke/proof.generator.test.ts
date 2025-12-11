@@ -1,0 +1,377 @@
+import { test, expect } from '@jest/globals';
+import {
+  Block,
+  JsonRpcProvider,
+  Contract,
+  Wallet,
+  InterfaceAbi,
+  TransactionReceipt,
+  TransactionResponse,
+} from 'ethers';
+
+import * as proof from '../../src/proof-generator';
+import { EncodingVersion } from '../../src/encodings';
+
+import BlockProverABI from '../abis/block_prover.json';
+import { keccak256 } from 'ethers';
+
+interface MockTransaction {
+  index: number;
+  blockNumber: number;
+  blockHash: string;
+  type: number;
+  nonce: number;
+  gasLimit: bigint;
+  from: string;
+  to: string;
+  value: bigint;
+  data: string;
+  chainId: number;
+  gasPrice: bigint;
+  accessList: any[];
+  signature: {
+    yParity: number;
+    r: string;
+    s: string;
+  };
+}
+
+interface MockTransactionReceipt {
+  index: number;
+  blockNumber: number;
+  blockHash: string;
+  status: number;
+  gasUsed: bigint;
+  logs: MockReceiptLog[];
+  logsBloom: string;
+}
+
+interface MockReceiptLog {
+  address: string;
+  topics: string[];
+  data: string;
+}
+
+interface MockBlock extends Block {
+  transactions: string[];
+  receipts: TransactionReceipt[];
+  prefetchedTransactions: TransactionResponse[];
+  getTransaction(indexOrHash: number | string): Promise<TransactionResponse>;
+}
+
+class MockBlockProvider implements proof.raw.blockProvider.BlockProvider {
+  private blockNumber: number = 1;
+
+  private transactions: Map<string, TransactionResponse> = new Map();
+  private blocks: Map<number, { block: Block; receipts: TransactionReceipt[] }> = new Map();
+
+  constructor() {}
+
+  public setBlockNumber(blockNumber: number) {
+    this.blockNumber = blockNumber;
+  }
+
+  public async getBlockNumber(): Promise<number> {
+    return this.blockNumber;
+  }
+
+  public async getTransaction(transactionHash: string): Promise<TransactionResponse | null> {
+    return this.transactions.get(transactionHash) || null;
+  }
+
+  public addBlocks(startBlockNumber: number, count: number) {
+    for (let i = 0; i <= count; i++) {
+      const blockNumber = startBlockNumber + i;
+      const blockHash = keccak256(Buffer.from(`block${blockNumber}`));
+      const transactionHash = keccak256(Buffer.from(`tx${blockNumber}_0`));
+      const transactions: string[] = [transactionHash];
+      const receipts: MockTransactionReceipt[] = [
+        {
+          index: 0,
+          blockNumber: blockNumber,
+          blockHash: blockHash,
+          status: 1,
+          gasUsed: BigInt(21000),
+          logs: [
+            {
+              address: keccak256(Buffer.from(`block${blockNumber}_0_log_address`)).slice(0, 42),
+              topics: [
+                keccak256(Buffer.from(`block${blockNumber}_0_log_topic1`)),
+                keccak256(Buffer.from(`block${blockNumber}_0_log_topic2`)),
+              ],
+              data: keccak256(Buffer.from(`block${blockNumber}_0_log_data`)),
+            },
+          ],
+          logsBloom: keccak256(Buffer.from(`block${blockNumber}_0_logs`)),
+        },
+      ];
+
+      const transaction: TransactionResponse = {
+        index: 0,
+        blockNumber: blockNumber,
+        blockHash: blockHash,
+        type: 1,
+        nonce: 0,
+        gasLimit: BigInt(21000),
+        from: keccak256(Buffer.from(`block${blockNumber}_0_from`)).slice(0, 42),
+        to: keccak256(Buffer.from(`block${blockNumber}_0_to`)).slice(0, 42),
+        value: BigInt(0),
+        data: '0x',
+        chainId: 0,
+        gasPrice: BigInt(23),
+        accessList: [],
+        signature: {
+          yParity: 0,
+          r: '0x' + '00'.repeat(32),
+          s: '0x' + '00'.repeat(32),
+        },
+      } as MockTransaction as unknown as TransactionResponse;
+      this.transactions.set(transactionHash, transaction as unknown as TransactionResponse);
+
+      const block: MockBlock = {
+        number: blockNumber,
+        transactions: transactions,
+        receipts: receipts as unknown as TransactionReceipt[],
+        prefetchedTransactions: [transaction],
+        getTransaction: async (indexOrHash: number | string): Promise<TransactionResponse> => {
+          if (typeof indexOrHash === 'number') {
+            const txHash = transactions[indexOrHash];
+            return this.transactions.get(txHash)!;
+          } else {
+            return this.transactions.get(indexOrHash)!;
+          }
+        },
+      } as MockBlock;
+
+      this.blocks.set(blockNumber, { block, receipts: block.receipts });
+    }
+  }
+
+  public addBlockWithReceipts(blockNumber: number, block: MockBlock) {
+    this.blocks.set(blockNumber, { block, receipts: block.receipts });
+  }
+
+  public async getBlockWithReceipts(blockNumber: number): Promise<{ block: Block; receipts: TransactionReceipt[] }> {
+    const data = this.blocks.get(blockNumber);
+    if (!data) {
+      throw new Error(`Block ${blockNumber} not found`);
+    }
+    return data;
+  }
+}
+
+class MockContinuityProvider implements proof.raw.continuityProvider.ContinuityProvider {
+  private upperBound: proof.raw.continuityProvider.ContinuityBound | null = null;
+  private lowerBound: proof.raw.continuityProvider.ContinuityBound | null = null;
+
+  public setUpperBound(blockNumber: number) {
+    this.upperBound = {
+      blockNumber: blockNumber,
+      digest: keccak256(Buffer.from(`continuity_upper_bound_${blockNumber}`)),
+    };
+  }
+
+  public setLowerBound(blockNumber: number) {
+    this.lowerBound = {
+      blockNumber: blockNumber,
+      digest: keccak256(Buffer.from(`continuity_lower_bound_${blockNumber}`)),
+    };
+  }
+
+  public async getContinuityBounds(
+    _chainKey: number,
+    _height: number,
+  ): Promise<proof.raw.continuityProvider.ContinuityBounds> {
+    return { lowerBound: this.lowerBound, upperBound: this.upperBound };
+  }
+}
+
+test('RawProofGenerator: should return proof', async () => {
+  // We create a bunch of mock blocks and transactions along with continuity bounds
+  // Using those we will be able to generate a proof for a transaction
+
+  const blockProvider = new MockBlockProvider();
+  const continuityProvider = new MockContinuityProvider();
+
+  blockProvider.addBlocks(0, 20);
+  blockProvider.setBlockNumber(20);
+
+  continuityProvider.setLowerBound(0);
+  continuityProvider.setUpperBound(20);
+
+  const block = await blockProvider.getBlockWithReceipts(11);
+  const txHash = block.block.transactions[0];
+
+  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+
+  const transactionHash = txHash;
+  const result = await generator.generateProof(transactionHash);
+
+  // We expect a successful proof generation
+  expect(result.success).toBe(true);
+  expect(result.error).toBeUndefined();
+});
+
+test('RawProofGenerator: should return error for non-existent transaction', async () => {
+  const blockProvider = new MockBlockProvider();
+  const continuityProvider = new MockContinuityProvider();
+
+  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+
+  const transactionHash = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+  const result = await generator.generateProof(transactionHash);
+
+  // Expect an error since transaction does not exist
+  expect(result.success).toBe(false);
+  expect(result.error).toBe(`Transaction ${transactionHash} not found`);
+});
+
+test('RawProofGenerator: return error if no lower bound', async () => {
+  // If no lower bound is found, we cannot build the continuity proof
+  // so an error will be returned
+
+  const blockProvider = new MockBlockProvider();
+  const continuityProvider = new MockContinuityProvider();
+
+  // We create blocks up to 10 and set current block number to 10
+  blockProvider.addBlocks(0, 10);
+  blockProvider.setBlockNumber(10);
+
+  // We set only upper bound to 20
+  continuityProvider.setUpperBound(20);
+
+  // We try to generate a proof for the first transaction in block 10
+  const block = await blockProvider.getBlockWithReceipts(10);
+  const txHash = block.block.transactions[0];
+
+  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+
+  const transactionHash = txHash;
+  const result = await generator.generateProof(transactionHash);
+
+  // Expect an error since lower bound is missing
+  expect(result.success).toBe(false);
+  expect(result.error).toBe(
+    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper bounds',
+  );
+});
+
+test('RawProofGenerator: return error if no upper bound', async () => {
+  // If no upper bound is found, we cannot build the continuity proof
+  // so an error will be returned
+
+  const blockProvider = new MockBlockProvider();
+  const continuityProvider = new MockContinuityProvider();
+
+  // We create blocks up to 10 and set current block number to 10
+  blockProvider.addBlocks(0, 10);
+  blockProvider.setBlockNumber(10);
+
+  // We set only lower bound to 0
+  continuityProvider.setLowerBound(0);
+
+  // We try to generate a proof for the first transaction in block 10
+  const block = await blockProvider.getBlockWithReceipts(10);
+  const txHash = block.block.transactions[0];
+
+  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+
+  const transactionHash = txHash;
+  const result = await generator.generateProof(transactionHash);
+
+  // Expect an error since upper bound is missing
+  expect(result.success).toBe(false);
+  expect(result.error).toBe(
+    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper bounds',
+  );
+});
+
+test('RawProofGenerator: return error if upper bound is above current block height', async () => {
+  // If latest block number is 10, but upper bound is 20 that means we cannot build the proof
+  // since we won't be able to fetch the required blocks to build it, so an error will be returned
+
+  const blockProvider = new MockBlockProvider();
+  const continuityProvider = new MockContinuityProvider();
+
+  // We create blocks up to 10 and set current block number to 10
+  blockProvider.addBlocks(0, 10);
+  blockProvider.setBlockNumber(10);
+
+  // We set lower bound to 0 and upper bound to 20 meaning that we have attestations/checkpoints
+  // all the way from block 0 to block 20
+  continuityProvider.setLowerBound(0);
+  continuityProvider.setUpperBound(20);
+
+  // We try to generate a proof for the first transaction in block 10
+  const block = await blockProvider.getBlockWithReceipts(10);
+  const txHash = block.block.transactions[0];
+
+  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+
+  const transactionHash = txHash;
+  const result = await generator.generateProof(transactionHash);
+
+  // Expect an error since upper bound is above latest block number
+  expect(result.success).toBe(false);
+  expect(result.error).toBe(
+    'Failed to build continuity proof: Cannot build continuity proof up to attestation/checkpoint at height 20 greater than latest block number 10',
+  );
+});
+
+test.skip('E2E ProofGenerator integration test', async () => {
+  // Alith private key from Anvil default accounts
+  const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+  const anvilRpc = 'http://localhost:8545';
+  const ethProvider = new JsonRpcProvider(anvilRpc);
+  const blockProvider = new proof.raw.blockProvider.SimpleBlockProvider(ethProvider);
+
+  // Continuity provider using precompile contract
+  const ccRpc = 'http://localhost:9944';
+  const ccProvider = new JsonRpcProvider(ccRpc);
+  const alith = new Wallet(privateKey, ccProvider);
+  const continuityProvider = new proof.raw.continuityProvider.PrecompileContinuityProvider(alith);
+
+  // Block prover contract
+  const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
+  const contractABI = BlockProverABI as unknown as InterfaceAbi;
+  const blockProverContract = new Contract(blockProverContractAddress, contractABI, alith);
+
+  // NOTE: Replace with your test chain key
+  const chainKey = 2;
+
+  // NOTE: Replace with a valid transaction hash from your Anvil instance
+  const transactionHash = '0x419f79244ee982c48feda702edd2329cd1c5aa25d849023e031665a82c7053ff';
+
+  // First we test with the raw proof generator
+  const rawProofGenerator = new proof.raw.RawProofGenerator(
+    chainKey,
+    blockProvider,
+    continuityProvider,
+    EncodingVersion.V1,
+  );
+  const rawProofResult = await rawProofGenerator.generateProof(transactionHash);
+  expect(rawProofResult.success).toBe(true);
+
+  const proofData = rawProofResult.data!;
+  const proveResultRaw = await blockProverContract.verify(
+    proofData.chainKey,
+    proofData.headerNumber,
+    proofData.txBytes,
+    proofData.merkleProof,
+    proofData.continuityProof,
+  );
+  expect(proveResultRaw).toBe(true);
+
+  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, 'http://localhost:3100', 5000);
+  const apiProofResult = await apiProvider.generateProof(transactionHash);
+  const apiProofData = apiProofResult.data!;
+
+  const proveResultApi = await blockProverContract.verify(
+    apiProofData.chainKey,
+    apiProofData.headerNumber,
+    apiProofData.txBytes,
+    apiProofData.merkleProof,
+    apiProofData.continuityProof,
+  );
+  expect(proveResultApi).toBe(true);
+});
