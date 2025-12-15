@@ -39,7 +39,6 @@ async function encodeTransaction(
     // 80 credits
     receipt = await provider.getTransactionReceipt(txHash);
   }
-  console.log(`*** DEBUG: will encode tx=${txHash}, transaction=${transaction!}, receipt=${receipt!}`);
   const encodedData = abiEncode(transaction!, receipt!);
   return encodedData.abi;
 }
