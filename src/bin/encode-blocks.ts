@@ -35,11 +35,9 @@ async function encodeTransaction(
   // 80 credits
   const transaction = await provider.getTransaction(txHash);
 
-  console.log(`*** DEBUG: before encoding tx=${txHash}, transaction=${transaction!}, receipt=${receipt!}`);
   if (receipt === null) {
     // 80 credits
     receipt = await provider.getTransactionReceipt(txHash);
-    console.log(`*** DEBUG: after fetching receipt for tx=${txHash} explicitly, receipt=${receipt!}`);
   }
   console.log(`*** DEBUG: will encode tx=${txHash}, transaction=${transaction!}, receipt=${receipt!}`);
   const encodedData = abiEncode(transaction!, receipt!);
