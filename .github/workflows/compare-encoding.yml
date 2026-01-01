@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload encoded data
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: encoded-by-alloy
           path: /var/tmp/encoded-data/alloy
@@ -141,7 +141,7 @@ jobs:
 
       - name: Upload encoded data
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: encoded-by-ethers
           path: /var/tmp/encoded-data/ethers
