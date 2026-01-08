@@ -1,18 +1,13 @@
 export * as raw from './raw-generator';
 export * as api from './api-generator';
 
-export interface ContinuityBlock {
-  merkleRoot: string;
-  digest: string;
-}
-
 export interface ContinuityProof {
   /** The digest of the block before the continuity chain starts
    * This is the prev_digest of the first block */
   lowerEndpointDigest: string;
-  /** Array of continuity blocks (each containing only root and digest)
-   * Block numbers are inferred: blocks[i] is at (queryHeight - 1) + i for single query */
-  blocks: ContinuityBlock[];
+  /** Array of merkle roots (digests computed on-chain)
+   * Block number for index i = startBlock + i, where startBlock = queryBlockHeight - 1 */
+  roots: string[];
 }
 
 export class TransactionMerkleProof {

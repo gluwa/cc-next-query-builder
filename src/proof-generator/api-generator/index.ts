@@ -14,14 +14,9 @@ interface ApiTransactionMerkleProof {
   siblings: ApiMerkleProofEntry[];
 }
 
-interface ApiContinuityBlock {
-  merkle_root: string;
-  digest: string;
-}
-
 interface ApiContinuityProof {
   lower_endpoint_digest: string;
-  blocks: ApiContinuityBlock[];
+  roots: string[];
 }
 
 interface ApiContinuityResponse {
@@ -97,10 +92,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
         txBytes: res.tx_bytes,
         continuityProof: {
           lowerEndpointDigest: res.continuity_proof.lower_endpoint_digest,
-          blocks: res.continuity_proof.blocks.map((block) => ({
-            merkleRoot: block.merkle_root,
-            digest: block.digest,
-          })),
+          roots: res.continuity_proof.roots,
         },
         merkleProof: {
           root: res.merkle_proof.root,

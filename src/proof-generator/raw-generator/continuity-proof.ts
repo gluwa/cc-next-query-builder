@@ -1,4 +1,4 @@
-import { ContinuityBlock, ContinuityProof } from '..';
+import { ContinuityProof } from '..';
 
 import { EncodingVersion } from '../../encodings';
 
@@ -51,22 +51,18 @@ export class ContinuityProofBuilder {
    */
   public static createFrom(blocks: AttestationBlock[]): ContinuityProof {
     if (blocks.length === 0) {
-      return { lowerEndpointDigest: '', blocks: [] };
+      return { lowerEndpointDigest: '', roots: [] };
     }
 
     // The lowerEndpointDigest is the prev_digest of the first block
     const lowerEndpointDigest = blocks[0].prevDigest;
 
-    // Convert blocks to ContinuityBlocks (dropping blockNumber and prevDigest)
-    // prevDigest will be reconstructed from the chain when converting back
-    const continuityBlocks: ContinuityBlock[] = blocks.map((b) => ({
-      merkleRoot: b.root,
-      digest: b.digest,
-    }));
+    // Extract merkle roots from blocks
+    const continuityRoots: string[] = blocks.map((b) => b.root);
 
     return {
       lowerEndpointDigest,
-      blocks: continuityBlocks,
+      roots: continuityRoots,
     };
   }
 
