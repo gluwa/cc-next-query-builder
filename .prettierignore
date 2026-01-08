@@ -9,3 +9,6 @@ node_modules
 
 # Package-lock
 package-lock.json
+
+# TS Config
+tsconfig.json
