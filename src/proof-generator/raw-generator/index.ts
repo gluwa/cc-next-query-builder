@@ -85,13 +85,10 @@ export class RawProofGenerator implements ProofGenerator {
     // We can now ABI encode all transactions in the block
     // which will be the leaves of the merkle tree
     const encodedTx = orderedTransactions.map((txData, idx) => {
-      // Block number 8 bytes BE
-      // Index 8 bytes BE
       // ABI encoded transaction + receipt
-      const abi = abiEncode(txData, orderedReceipts[idx], EncodingVersion.V1);
-      const encodedData = solidityPacked(['uint64', 'uint64', 'bytes'], [blockNumber, txData.index, abi.abi]);
+      const encoded = abiEncode(txData, orderedReceipts[idx], EncodingVersion.V1);
 
-      return encodedData;
+      return encoded.abi;
     });
 
     // We can now build the merkle tree and proof
