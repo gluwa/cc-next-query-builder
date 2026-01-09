@@ -22,19 +22,19 @@ export class AttestationBlock {
 
 export class ContinuityProofBuilder {
   private blockProvider: BlockProvider;
-  private attestationProvider: ContinuityProvider;
+  private continuityProvider: ContinuityProvider;
 
   private chainKey: number;
   private encoding: EncodingVersion;
 
   constructor(
     blockProvider: BlockProvider,
-    attestationProvider: ContinuityProvider,
+    continuityProvider: ContinuityProvider,
     chainKey: number,
     encoding: EncodingVersion,
   ) {
     this.blockProvider = blockProvider;
-    this.attestationProvider = attestationProvider;
+    this.continuityProvider = continuityProvider;
 
     this.chainKey = chainKey;
     this.encoding = encoding;
@@ -84,7 +84,7 @@ export class ContinuityProofBuilder {
    */
   public async createForHeight(queryHeight: number): Promise<ContinuityProof> {
     // Fetch attestation bounds from the attestation provider
-    const bounds = await this.attestationProvider.getContinuityBounds(this.chainKey, queryHeight);
+    const bounds = await this.continuityProvider.getContinuityBounds(this.chainKey, queryHeight);
     if (!bounds.lowerBound || !bounds.upperBound) {
       throw new Error(`Cannot build continuity proof for height ${queryHeight} without both lower and upper bounds`);
     }

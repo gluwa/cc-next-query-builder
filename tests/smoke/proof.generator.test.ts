@@ -319,28 +319,26 @@ test('RawProofGenerator: return error if upper bound is above current block heig
 });
 
 test.skip('E2E ProofGenerator integration test', async () => {
-  // Alith private key from Anvil default accounts
-  const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-  const anvilRpc = 'http://localhost:8545';
-  const ethProvider = new JsonRpcProvider(anvilRpc);
+  // Initialize block provider connected to local source ethereum chain
+  const sourceChainRpc = 'http://localhost:8545';
+  const ethProvider = new JsonRpcProvider(sourceChainRpc);
   const blockProvider = new proof.raw.blockProvider.SimpleBlockProvider(ethProvider);
 
-  // Continuity provider using precompile contract
+  // Continuity provider using precompile contract from local creditcoin chain
   const ccRpc = 'http://localhost:9944';
   const ccProvider = new JsonRpcProvider(ccRpc);
-  const alith = new Wallet(privateKey, ccProvider);
-  const continuityProvider = new proof.raw.continuityProvider.PrecompileContinuityProvider(alith);
+  const continuityProvider = new proof.raw.continuityProvider.PrecompileContinuityProvider(ccProvider);
 
-  // Block prover contract
+  // Initialize BlockProver contract instance from local creditcoin chain
   const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
   const contractABI = BlockProverABI as unknown as InterfaceAbi;
-  const blockProverContract = new Contract(blockProverContractAddress, contractABI, alith);
+  const blockProverContract = new Contract(blockProverContractAddress, contractABI, ccProvider);
 
   // NOTE: Replace with your test chain key
   const chainKey = 2;
 
-  // NOTE: Replace with a valid transaction hash from your Anvil instance
-  const transactionHash = '0x419f79244ee982c48feda702edd2329cd1c5aa25d849023e031665a82c7053ff';
+  // NOTE: Replace with a valid transaction hash from your local source chain
+  const transactionHash = '0x2bdf702215374ffd448c0d08f7d36037606cf23f4d9362c59b9317c29f54fa02';
 
   // First we test with the raw proof generator
   const rawProofGenerator = new proof.raw.RawProofGenerator(
@@ -362,10 +360,14 @@ test.skip('E2E ProofGenerator integration test', async () => {
   );
   expect(proveResultRaw).toBe(true);
 
-  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, 'http://localhost:3100', 5000);
+  // Then we test with the proof generator API server
+  const apiServerUrl = 'http://localhost:3100';
+  const requestTimeout = 5000; // 5 seconds
+  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl, requestTimeout);
   const apiProofResult = await apiProvider.generateProof(transactionHash);
-  const apiProofData = apiProofResult.data!;
+  expect(apiProofResult.success).toBe(true);
 
+  const apiProofData = apiProofResult.data!;
   const proveResultApi = await blockProverContract.verify(
     apiProofData.chainKey,
     apiProofData.headerNumber,

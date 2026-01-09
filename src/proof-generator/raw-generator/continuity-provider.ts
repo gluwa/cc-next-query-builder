@@ -1,4 +1,4 @@
-import { Contract, InterfaceAbi, Wallet } from 'ethers';
+import { Contract, InterfaceAbi, JsonRpcApiProvider, Wallet } from 'ethers';
 
 import ChainInfoABI from './chain_info.json';
 
@@ -21,7 +21,8 @@ export interface ContinuityProvider {
 /**
  * Default address for the ChainInfo precompile contract
  */
-export const PRECOMPILE_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000fd3';
+export const CHAIN_INFO_PRECOMPILE_ADDRESS = '0x0000000000000000000000000000000000000fd3';
+
 interface AttestationBounds {
   parentHeight: bigint;
   parentHash: string;
@@ -33,12 +34,10 @@ interface AttestationBounds {
 }
 
 export class PrecompileContinuityProvider implements ContinuityProvider {
-  private wallet: Wallet;
   private chainInfoContract: Contract;
 
-  constructor(wallet: Wallet, precompileAddress: string = PRECOMPILE_CONTRACT_ADDRESS) {
-    this.wallet = wallet;
-    this.chainInfoContract = new Contract(precompileAddress, contractABI, this.wallet);
+  constructor(provider: JsonRpcApiProvider, chainInfoPrecompile: string = CHAIN_INFO_PRECOMPILE_ADDRESS) {
+    this.chainInfoContract = new Contract(chainInfoPrecompile, contractABI, provider);
   }
 
   public async getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds> {
