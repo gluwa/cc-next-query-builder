@@ -100,8 +100,6 @@ export class ContinuityProofBuilder {
   }
 
   private async buildAndTrimContinuityFor(queryHeight: number, bounds: ContinuityBounds): Promise<AttestationBlock[]> {
-    const requiredStartHeight = queryHeight === 1 ? 0 : queryHeight - 1;
-
     const lowerBound = bounds.lowerBound!;
     const upperBound = bounds.upperBound!;
 
@@ -134,8 +132,8 @@ export class ContinuityProofBuilder {
     // Query and build continuity blocks
     const blocks = await this.createContinuityBlocks(buildStartHeight, endHeight, lowerBound.digest);
 
-    // Trim blocks to start from requiredStartHeight
-    const filteredBlocks = blocks.filter((b) => b.blockNumber >= requiredStartHeight);
+    // Trim blocks to start from queryHeight
+    const filteredBlocks = blocks.filter((b) => b.blockNumber >= queryHeight);
 
     return filteredBlocks;
   }
