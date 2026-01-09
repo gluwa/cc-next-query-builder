@@ -53,12 +53,7 @@ export function computeMerkleRootOfBlock(
     const receipt = receipts[index];
     const result = abiEncode(transaction, receipt, encoding);
 
-    // Block number 8 bytes BE
-    // Index 8 bytes BE
-    // ABI encoded transaction + receipt
-    const encodedData = solidityPacked(['uint64', 'uint64', 'bytes'], [block.number, transaction.index, result.abi]);
-
-    return encodedData;
+    return result.abi;
   });
 
   // If the block has no transactions, return the default hash
