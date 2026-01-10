@@ -1,17 +1,13 @@
-import { solidityPacked } from 'ethers';
-
-import { ProofGenerationResult, ProofGenerator } from '..';
+import { ProofGenerationResult, ProofGenerator, chainInfo } from '..';
 
 import { abiEncode, EncodingVersion } from '../../encodings';
 
 import { ContinuityProofBuilder } from './continuity-proof';
 import { KeccakMerkleTree } from './merkle';
 import { BlockProvider } from './block-provider';
-import { ContinuityProvider } from './continuity-provider';
 
 // Re-export for easier access
 export * as blockProvider from './block-provider';
-export * as continuityProvider from './continuity-provider';
 export { EncodingVersion } from '../../encodings';
 
 /**
@@ -23,7 +19,7 @@ export { EncodingVersion } from '../../encodings';
  */
 export class RawProofGenerator implements ProofGenerator {
   private blockProvider: BlockProvider;
-  private continuityProvider: ContinuityProvider;
+  private chainInfoProvider: chainInfo.ChainInfoProvider;
 
   private chainKey: number;
   private builder: ContinuityProofBuilder;
@@ -31,14 +27,13 @@ export class RawProofGenerator implements ProofGenerator {
   constructor(
     chainKey: number,
     blockProvider: BlockProvider,
-    continuityProvider: ContinuityProvider,
+    chainInfoProvider: chainInfo.ChainInfoProvider,
     encoding: EncodingVersion,
   ) {
     this.blockProvider = blockProvider;
-    this.continuityProvider = continuityProvider;
-
+    this.chainInfoProvider = chainInfoProvider;
     this.chainKey = chainKey;
-    this.builder = new ContinuityProofBuilder(this.blockProvider, this.continuityProvider, chainKey, encoding);
+    this.builder = new ContinuityProofBuilder(this.blockProvider, this.chainInfoProvider, chainKey, encoding);
   }
 
   public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {

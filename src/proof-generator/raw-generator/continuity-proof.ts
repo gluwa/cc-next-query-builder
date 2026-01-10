@@ -1,10 +1,9 @@
-import { ContinuityProof } from '..';
+import { ContinuityProof, chainInfo } from '..';
 
 import { EncodingVersion } from '../../encodings';
 
 import { computeDigestOf, computeMerkleRootOfBlock } from './merkle';
 import { BlockProvider } from './block-provider';
-import { ContinuityBounds, ContinuityProvider } from './continuity-provider';
 
 export class AttestationBlock {
   public blockNumber: number;
@@ -22,19 +21,19 @@ export class AttestationBlock {
 
 export class ContinuityProofBuilder {
   private blockProvider: BlockProvider;
-  private continuityProvider: ContinuityProvider;
+  private chainInfoProvider: chainInfo.ChainInfoProvider;
 
   private chainKey: number;
   private encoding: EncodingVersion;
 
   constructor(
     blockProvider: BlockProvider,
-    continuityProvider: ContinuityProvider,
+    chainInfoProvider: chainInfo.ChainInfoProvider,
     chainKey: number,
     encoding: EncodingVersion,
   ) {
     this.blockProvider = blockProvider;
-    this.continuityProvider = continuityProvider;
+    this.chainInfoProvider = chainInfoProvider;
 
     this.chainKey = chainKey;
     this.encoding = encoding;
@@ -83,8 +82,15 @@ export class ContinuityProofBuilder {
    * @returns A ContinuityProof object representing the proof for the given height
    */
   public async createForHeight(queryHeight: number): Promise<ContinuityProof> {
+    const genesisHeight = await this.chainInfoProvider.getAttestationGenesisHeight(this.chainKey);
+    if (queryHeight < genesisHeight) {
+      throw new Error(
+        `Cannot build continuity proof for height ${queryHeight} below attestation genesis height ${genesisHeight}`,
+      );
+    }
+
     // Fetch attestation bounds from the attestation provider
-    const bounds = await this.continuityProvider.getContinuityBounds(this.chainKey, queryHeight);
+    const bounds = await this.chainInfoProvider.getContinuityBounds(this.chainKey, queryHeight);
     if (!bounds.lowerBound || !bounds.upperBound) {
       throw new Error(`Cannot build continuity proof for height ${queryHeight} without both lower and upper bounds`);
     }
@@ -99,7 +105,10 @@ export class ContinuityProofBuilder {
     return ContinuityProofBuilder.createFrom(blocks);
   }
 
-  private async buildAndTrimContinuityFor(queryHeight: number, bounds: ContinuityBounds): Promise<AttestationBlock[]> {
+  private async buildAndTrimContinuityFor(
+    queryHeight: number,
+    bounds: chainInfo.ContinuityBounds,
+  ): Promise<AttestationBlock[]> {
     const lowerBound = bounds.lowerBound!;
     const upperBound = bounds.upperBound!;
 
