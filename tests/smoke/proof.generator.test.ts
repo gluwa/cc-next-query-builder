@@ -191,6 +191,15 @@ class MockContinuityProvider implements proof.chainInfo.ChainInfoProvider {
   public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
     return 0;
   }
+
+  public async waitUntilHeightAttested(
+    _chainKey: number,
+    _targetHeight: number,
+    _pollIntervalMs: number = 1000,
+    _waitTimeoutMs: number = 60000,
+  ): Promise<void> {
+    return;
+  }
 }
 
 test('RawProofGenerator: should return proof', async () => {

@@ -19,6 +19,12 @@ export interface ChainInfoProvider {
   getSupportedChains(): Promise<ChainInfo[]>;
   getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash>;
   getAttestationGenesisHeight(chainKey: number): Promise<number>;
+  waitUntilHeightAttested(
+    chainKey: number,
+    targetHeight: number,
+    pollIntervalMs?: number,
+    waitTimeoutMs?: number,
+  ): Promise<void>;
 }
 
 /**
