@@ -160,9 +160,9 @@ class MockBlockProvider implements proof.raw.blockProvider.BlockProvider {
   }
 }
 
-class MockContinuityProvider implements proof.raw.continuityProvider.ContinuityProvider {
-  private upperBound: proof.raw.continuityProvider.ContinuityBound | null = null;
-  private lowerBound: proof.raw.continuityProvider.ContinuityBound | null = null;
+class MockContinuityProvider implements proof.chainInfo.ChainInfoProvider {
+  private upperBound: proof.chainInfo.ContinuityBound | null = null;
+  private lowerBound: proof.chainInfo.ContinuityBound | null = null;
 
   public setUpperBound(blockNumber: number) {
     this.upperBound = {
@@ -178,11 +178,27 @@ class MockContinuityProvider implements proof.raw.continuityProvider.ContinuityP
     };
   }
 
-  public async getContinuityBounds(
-    _chainKey: number,
-    _height: number,
-  ): Promise<proof.raw.continuityProvider.ContinuityBounds> {
+  public async getContinuityBounds(_chainKey: number, _height: number): Promise<proof.chainInfo.ContinuityBounds> {
     return { lowerBound: this.lowerBound, upperBound: this.upperBound };
+  }
+
+  public async getSupportedChains(): Promise<proof.chainInfo.ChainInfo[]> {
+    throw new Error('Method not implemented.');
+  }
+  public async getLatestAttestedHeightAndHash(chainKey: number): Promise<proof.chainInfo.HeightHash> {
+    throw new Error('Method not implemented.');
+  }
+  public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
+    return 0;
+  }
+
+  public async waitUntilHeightAttested(
+    _chainKey: number,
+    _targetHeight: number,
+    _pollIntervalMs: number = 1000,
+    _waitTimeoutMs: number = 60000,
+  ): Promise<void> {
+    return;
   }
 }
 
@@ -319,34 +335,45 @@ test('RawProofGenerator: return error if upper bound is above current block heig
 });
 
 test.skip('E2E ProofGenerator integration test', async () => {
-  // Alith private key from Anvil default accounts
-  const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-  const anvilRpc = 'http://localhost:8545';
-  const ethProvider = new JsonRpcProvider(anvilRpc);
+  // Initialize block provider connected to local source ethereum chain
+  const sourceChainRpc = 'http://localhost:8545';
+  const ethProvider = new JsonRpcProvider(sourceChainRpc);
   const blockProvider = new proof.raw.blockProvider.SimpleBlockProvider(ethProvider);
 
-  // Continuity provider using precompile contract
+  // Continuity provider using precompile contract from local creditcoin chain
   const ccRpc = 'http://localhost:9944';
   const ccProvider = new JsonRpcProvider(ccRpc);
-  const alith = new Wallet(privateKey, ccProvider);
-  const continuityProvider = new proof.raw.continuityProvider.PrecompileContinuityProvider(alith);
+  const chainInfoProvider = new proof.chainInfo.PrecompileChainInfoProvider(ccProvider);
 
-  // Block prover contract
-  const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
-  const contractABI = BlockProverABI as unknown as InterfaceAbi;
-  const blockProverContract = new Contract(blockProverContractAddress, contractABI, alith);
+  const chainInfos = await chainInfoProvider.getSupportedChains();
+  console.log('Supported chains from continuity provider:', chainInfos);
+
+  const latestHeightHash = await chainInfoProvider.getLatestAttestedHeightAndHash(2);
+  console.log('Latest attested height and hash for chain key 2:', latestHeightHash);
+
+  const genesisHeightHash = await chainInfoProvider.getAttestationGenesisHeight(2);
+  console.log('Genesis attestation height for chain key 2:', genesisHeightHash);
 
   // NOTE: Replace with your test chain key
   const chainKey = 2;
 
-  // NOTE: Replace with a valid transaction hash from your Anvil instance
-  const transactionHash = '0x419f79244ee982c48feda702edd2329cd1c5aa25d849023e031665a82c7053ff';
+  // We await just to showcase the waitUntilHeightAttested method, its not really needed here
+  console.log(`Waiting for block ${latestHeightHash.height + 10} to be attestated...`);
+  await chainInfoProvider.waitUntilHeightAttested(chainKey, latestHeightHash.height + 10);
+
+  // Initialize BlockProver contract instance from local creditcoin chain
+  const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
+  const contractABI = BlockProverABI as unknown as InterfaceAbi;
+  const blockProverContract = new Contract(blockProverContractAddress, contractABI, ccProvider);
+
+  // NOTE: Replace with a valid transaction hash from your local source chain
+  const transactionHash = '0xd9aea5b9c64682c81d8f4077bae5e457f3babc885ca583dbc0608c5d2da7b1c3';
 
   // First we test with the raw proof generator
   const rawProofGenerator = new proof.raw.RawProofGenerator(
     chainKey,
     blockProvider,
-    continuityProvider,
+    chainInfoProvider,
     EncodingVersion.V1,
   );
   const rawProofResult = await rawProofGenerator.generateProof(transactionHash);
@@ -362,10 +389,14 @@ test.skip('E2E ProofGenerator integration test', async () => {
   );
   expect(proveResultRaw).toBe(true);
 
-  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, 'http://localhost:3100', 5000);
+  // Then we test with the proof generator API server
+  const apiServerUrl = 'http://localhost:3100';
+  const requestTimeout = 5000; // 5 seconds
+  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl, requestTimeout);
   const apiProofResult = await apiProvider.generateProof(transactionHash);
-  const apiProofData = apiProofResult.data!;
+  expect(apiProofResult.success).toBe(true);
 
+  const apiProofData = apiProofResult.data!;
   const proveResultApi = await blockProverContract.verify(
     apiProofData.chainKey,
     apiProofData.headerNumber,
@@ -374,4 +405,4 @@ test.skip('E2E ProofGenerator integration test', async () => {
     apiProofData.continuityProof,
   );
   expect(proveResultApi).toBe(true);
-});
+}, 120_000);

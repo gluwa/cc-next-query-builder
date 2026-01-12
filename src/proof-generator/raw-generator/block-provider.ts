@@ -1,4 +1,4 @@
-import { Block, JsonRpcProvider, TransactionReceipt, TransactionResponse } from 'ethers';
+import { Block, JsonRpcApiProvider, TransactionReceipt, TransactionResponse } from 'ethers';
 
 /**
  * Abstract interface for an Ethereum block provider.
@@ -10,23 +10,23 @@ export interface BlockProvider {
 }
 
 /**
- * Simple implementation of BlockProvider using an ethers JsonRpcProvider.
+ * Simple implementation of BlockProvider using an implementation of ethers JsonRpcApiProvider.
  *
  * Has no caching or optimizations.
  */
 export class SimpleBlockProvider implements BlockProvider {
-  private jsonProvider: JsonRpcProvider;
+  private rpc: JsonRpcApiProvider;
 
-  constructor(jsonProvider: JsonRpcProvider) {
-    this.jsonProvider = jsonProvider;
+  constructor(rpc: JsonRpcApiProvider) {
+    this.rpc = rpc;
   }
 
   public getBlockNumber(): Promise<number> {
-    return this.jsonProvider.getBlockNumber();
+    return this.rpc.getBlockNumber();
   }
 
   public async getTransaction(transactionHash: string): Promise<TransactionResponse | null> {
-    return this.jsonProvider.getTransaction(transactionHash);
+    return this.rpc.getTransaction(transactionHash);
   }
 
   public async getBlockWithReceipts(blockNumber: number): Promise<{ block: Block; receipts: TransactionReceipt[] }> {
@@ -35,7 +35,7 @@ export class SimpleBlockProvider implements BlockProvider {
 
     // Not in cache, fetch from RPC
     // Get raw block data with transactions prefetched
-    const blockDataRaw = await this.jsonProvider.send('eth_getBlockByNumber', [`0x${blockNumber.toString(16)}`, true]);
+    const blockDataRaw = await this.rpc.send('eth_getBlockByNumber', [`0x${blockNumber.toString(16)}`, true]);
     if (!blockDataRaw) {
       throw new Error(`Block ${blockNumber} not found`);
     }
@@ -44,13 +44,11 @@ export class SimpleBlockProvider implements BlockProvider {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Get raw receipts data
-    const receiptsDataRaw = await this.jsonProvider.send('eth_getBlockReceipts', [`0x${blockNumber.toString(16)}`]);
+    const receiptsDataRaw = await this.rpc.send('eth_getBlockReceipts', [`0x${blockNumber.toString(16)}`]);
 
     // Wrap into ethers objects for use using provider's wrap methods
-    const block = (this.jsonProvider as any)._wrapBlock(blockDataRaw, true);
-    const receipts = receiptsDataRaw.map((r: any) =>
-      this.jsonProvider._wrapTransactionReceipt(r, this.jsonProvider._network),
-    );
+    const block = (this.rpc as any)._wrapBlock(blockDataRaw, true);
+    const receipts = receiptsDataRaw.map((r: any) => this.rpc._wrapTransactionReceipt(r, this.rpc._network));
 
     return { block, receipts };
   }

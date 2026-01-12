@@ -1,5 +1,6 @@
 export * as raw from './raw-generator';
 export * as api from './api-generator';
+export * as chainInfo from './chain-info';
 
 export interface ContinuityProof {
   /** The digest of the block before the continuity chain starts
