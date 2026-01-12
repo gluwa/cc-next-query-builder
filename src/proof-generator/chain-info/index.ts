@@ -143,9 +143,11 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
         return [];
       }
 
-      let chainInfo: ChainInfo[] = [];
-      for (let i = 0; i < chains.length; i++) {
-        let chainEntry = chains[i];
+      const chainInfo: ChainInfo[] = chains.map((chainEntry: any) => {
+        // Validate entry structure try to extract fields
+        if (!chainEntry || typeof chainEntry !== 'object') {
+          throw new Error('Invalid chain info entry: expected object');
+        }
 
         if (chainEntry.length !== 4) {
           throw new Error(
@@ -153,13 +155,13 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
           );
         }
 
-        chainInfo[i] = {
+        return {
           chainKey: Number(chainEntry[0]),
           chainId: Number(chainEntry[1]),
           chainName: chainEntry[2], // TODO: Name decoding seems to be failing, investigate (you get all zeros currently)
           chainEncoding: Number(chainEntry[3]),
         };
-      }
+      });
 
       return chainInfo;
     } catch (error) {

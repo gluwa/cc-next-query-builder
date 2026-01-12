@@ -357,6 +357,7 @@ test.skip('E2E ProofGenerator integration test', async () => {
   // NOTE: Replace with your test chain key
   const chainKey = 2;
 
+  // We await just to showcase the waitUntilHeightAttested method, its not really needed here
   console.log(`Waiting for block ${latestHeightHash.height + 10} to be attestated...`);
   await chainInfoProvider.waitUntilHeightAttested(chainKey, latestHeightHash.height + 10);
 
@@ -389,7 +390,7 @@ test.skip('E2E ProofGenerator integration test', async () => {
   expect(proveResultRaw).toBe(true);
 
   // Then we test with the proof generator API server
-  /*const apiServerUrl = 'http://localhost:3100';
+  const apiServerUrl = 'http://localhost:3100';
   const requestTimeout = 5000; // 5 seconds
   const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl, requestTimeout);
   const apiProofResult = await apiProvider.generateProof(transactionHash);
@@ -403,5 +404,5 @@ test.skip('E2E ProofGenerator integration test', async () => {
     apiProofData.merkleProof,
     apiProofData.continuityProof,
   );
-  expect(proveResultApi).toBe(true);*/
+  expect(proveResultApi).toBe(true);
 }, 120_000);
