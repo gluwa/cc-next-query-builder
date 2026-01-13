@@ -4,51 +4,24 @@ import { ContinuityResponse, ProofGenerationResult, ProofGenerator } from '..';
 
 const API_BASE_PATH = '/api/v1/proof-by-tx';
 
-interface ApiMerkleProofEntry {
-  hash: string;
-  is_left: boolean;
-}
-
-interface ApiTransactionMerkleProof {
-  root: string;
-  siblings: ApiMerkleProofEntry[];
-}
-
-interface ApiContinuityProof {
-  lower_endpoint_digest: string;
-  roots: string[];
-}
-
-interface ApiContinuityResponse {
-  chain_key: number;
-  header_number: number;
-  tx_index: number;
-  tx_hash: string;
-  tx_bytes: string;
-  continuity_proof: ApiContinuityProof;
-  merkle_proof: ApiTransactionMerkleProof;
-  cached: boolean;
-  generated_at: Date;
-}
-
 class ApiClient {
   private client: AxiosInstance;
 
-  constructor(baseURL: string, timeout: number = 5000) {
+  constructor(baseURL: string, timeoutMs: number = 5000) {
     this.client = axios.create({
       baseURL,
-      timeout,
+      timeout: timeoutMs,
       headers: {
         'Content-Type': 'application/json',
       },
     });
   }
 
-  async queryProofFor(chainKey: number, transactionHash: string): Promise<ApiContinuityResponse> {
+  async queryProofFor(chainKey: number, transactionHash: string): Promise<ContinuityResponse> {
     try {
       const res = await this.client.get(`${API_BASE_PATH}/${chainKey}/${transactionHash}`);
 
-      return res.data as ApiContinuityResponse;
+      return res.data as ContinuityResponse;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Failed to fetch proof: ${error}`);
@@ -66,7 +39,7 @@ class ApiClient {
  *
  * Timeout can be configured for the HTTP requests.
  *
- * Server is expected to expose an endpoint at `/api/v1/proof-by-tx/{transactionHash}`
+ * Server is expected to expose an endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
  *
  */
 export class ProverAPIProofGenerator implements ProofGenerator {
@@ -79,31 +52,18 @@ export class ProverAPIProofGenerator implements ProofGenerator {
     this.client = new ApiClient(apiServerUrl, timeout);
   }
 
+  /**
+   * Generates a proof for the given transaction hash by querying the remote proof API server.
+   *
+   * Transaction hash should be provided as a hex string, and should exists in the source chain for which the
+   * chainKey was specified during the generator construction.
+   *
+   * @param transactionHash - The hash of the transaction to generate a proof for, as a hex string.
+   * @returns A promise that resolves to the result of the proof generation
+   */
   public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
     try {
-      const res = await this.client.queryProofFor(this.chainKey, transactionHash);
-
-      // Convert API response to ContinuityResponse
-      const continuityProof: ContinuityResponse = {
-        chainKey: res.chain_key,
-        headerNumber: res.header_number,
-        txIndex: res.tx_index,
-        txHash: res.tx_hash,
-        txBytes: res.tx_bytes,
-        continuityProof: {
-          lowerEndpointDigest: res.continuity_proof.lower_endpoint_digest,
-          roots: res.continuity_proof.roots,
-        },
-        merkleProof: {
-          root: res.merkle_proof.root,
-          siblings: res.merkle_proof.siblings.map((entry) => ({
-            hash: entry.hash,
-            isLeft: entry.is_left,
-          })),
-        },
-        cached: res.cached,
-        generatedAt: new Date(res.generated_at),
-      };
+      const continuityProof = await this.client.queryProofFor(this.chainKey, transactionHash);
 
       return { success: true, data: continuityProof };
     } catch (error) {

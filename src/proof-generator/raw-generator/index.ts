@@ -13,7 +13,8 @@ export { EncodingVersion } from '../../encodings';
 /**
  * RawProofGenerator generates raw proofs for a given transaction.
  *
- * It uses both an Ethereum JSON-RPC provider and a Polkadot API provider to fetch necessary data.
+ * It uses a BlockProvider to fetch block and transaction data from the source chain. And a ChainInfoProvider
+ * to get chain-specific information needed for proof generation from the attestation chain.
  *
  * The generator constructs Merkle proofs for transactions and continuity proofs for blocks.
  */
