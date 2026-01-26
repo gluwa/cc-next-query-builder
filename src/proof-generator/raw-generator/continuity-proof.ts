@@ -1,6 +1,7 @@
-import { ContinuityProof, chainInfo } from '..';
+import { ContinuityProof } from '..';
+import { ChainInfoProvider, ContinuityBounds } from '../../chain-info';
 
-import { EncodingVersion } from '../../encodings';
+import { EncodingVersion } from '../../encoding';
 
 import { computeDigestOf, computeMerkleRootOfBlock } from './merkle';
 import { BlockProvider } from './block-provider';
@@ -21,14 +22,14 @@ export class AttestationBlock {
 
 export class ContinuityProofBuilder {
   private blockProvider: BlockProvider;
-  private chainInfoProvider: chainInfo.ChainInfoProvider;
+  private chainInfoProvider: ChainInfoProvider;
 
   private chainKey: number;
   private encoding: EncodingVersion;
 
   constructor(
     blockProvider: BlockProvider,
-    chainInfoProvider: chainInfo.ChainInfoProvider,
+    chainInfoProvider: ChainInfoProvider,
     chainKey: number,
     encoding: EncodingVersion,
   ) {
@@ -45,8 +46,23 @@ export class ContinuityProofBuilder {
    * Blocks are expected to be in order from **lowest to highest block number** and to be contiguous.
    * Otherwise, the resulting proof will not be usable for proving.
    *
-   * @param blocks Array of AttestationBlocks to convert
-   * @returns ContinuityProof object
+   * @param blocks Array of AttestationBlocks to convert, ordered by block number
+   * @returns ContinuityProof object with lowerEndpointDigest and merkle roots
+   *
+   * @example
+   * ```typescript
+   * const blocks = [
+   *   new AttestationBlock(100, '0xroot1', '0xdigest1', '0xprev1'),
+   *   new AttestationBlock(101, '0xroot2', '0xdigest2', '0xdigest1'),
+   *   new AttestationBlock(102, '0xroot3', '0xdigest3', '0xdigest2')
+   * ];
+   *
+   * const proof = ContinuityProofBuilder.createFrom(blocks);
+   * // Result: {
+   * //   lowerEndpointDigest: '0xprev1',
+   * //   roots: ['0xroot1', '0xroot2', '0xroot3']
+   * // }
+   * ```
    */
   public static createFrom(blocks: AttestationBlock[]): ContinuityProof {
     if (blocks.length === 0) {
@@ -78,8 +94,27 @@ export class ContinuityProofBuilder {
    * If the proof cannot be built (e.g. no attestations exist, bounds cannot be found, etc),
    * **the method will throw an error**.
    *
-   * @param queryHeight The block height for which to build the continuity proof
-   * @returns A ContinuityProof object representing the proof for the given height
+   * @param queryHeight The block height for which to build the continuity proof (must be >= attestation genesis height)
+   * @returns A Promise that resolves to a ContinuityProof object representing the proof for the given height
+   * @throws Error if queryHeight is below genesis height, bounds cannot be found, or chain data is unavailable
+   *
+   * @example
+   * ```typescript
+   * const builder = new ContinuityProofBuilder(
+   *   blockProvider,
+   *   chainInfoProvider,
+   *   chainKey,
+   *   EncodingVersion.V1
+   * );
+   *
+   * try {
+   *   const proof = await builder.createForHeight(12345);
+   *   console.log('Proof created:', proof);
+   *   // Use proof for verification or submission
+   * } catch (error) {
+   *   console.error('Failed to build proof:', error.message);
+   * }
+   * ```
    */
   public async createForHeight(queryHeight: number): Promise<ContinuityProof> {
     const genesisHeight = await this.chainInfoProvider.getAttestationGenesisHeight(this.chainKey);
@@ -105,10 +140,7 @@ export class ContinuityProofBuilder {
     return ContinuityProofBuilder.createFrom(blocks);
   }
 
-  private async buildAndTrimContinuityFor(
-    queryHeight: number,
-    bounds: chainInfo.ContinuityBounds,
-  ): Promise<AttestationBlock[]> {
+  private async buildAndTrimContinuityFor(queryHeight: number, bounds: ContinuityBounds): Promise<AttestationBlock[]> {
     const lowerBound = bounds.lowerBound!;
     const upperBound = bounds.upperBound!;
 

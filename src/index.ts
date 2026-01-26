@@ -1,3 +1,5 @@
-export * from './encodings';
-export * from './query-builder';
-export * from './proof-generator';
+export * as encoding from './encoding';
+export * as queryBuilder from './query-builder';
+export * as proofGenerator from './proof-generator';
+export * as chainInfo from './chain-info';
+export * as blockProver from './block-prover';

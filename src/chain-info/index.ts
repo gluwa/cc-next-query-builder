@@ -4,14 +4,55 @@ import ChainInfoABI from './chain_info_abi.json';
 
 const contractABI = ChainInfoABI as unknown as InterfaceAbi;
 
+/**
+ * Definition of a continuity bound for a specific block.
+ * @member blockNumber - The block number of the bound
+ * @member digest - The block digest of the bound
+ */
 export interface ContinuityBound {
   blockNumber: number;
   digest: string;
 }
 
+/**
+ * Continuity bounds structure for a specific block height.
+ * @member lowerBound - The lower continuity bound (**can be null if not attested**)
+ * @member upperBound - The upper continuity bound (**can be null if not attested**)
+ */
 export interface ContinuityBounds {
   lowerBound: ContinuityBound | null;
   upperBound: ContinuityBound | null;
+}
+
+/**
+ * Individual chain information structure
+ * @member chainKey - Unique identifier for the source chain on the creditcoin network
+ * @member chainId - Native chain ID of the source chain
+ * @member chainName - Human-readable name of the source chain on the creditcoin network
+ * @member chainEncoding - Encoding version used by the source chain, used for transaction
+ * encoding/decoding in the `abiEncode` function from `encoding/abi`
+ */
+export interface ChainInfo {
+  chainKey: number;
+  chainId: number;
+  chainName: string;
+  chainEncoding: number;
+}
+
+/**
+ * Information about the latest attested block height and hash for a specific chain.
+ *
+ * If `exists` is false, it indicates that there are no attestations for the specified chain,
+ * and the values of `height` and `hash` should not be considered usable.
+ *
+ * @member height - Block number of the latest attested block
+ * @member hash - Block digest of the latest attested block
+ * @member exists - Whether any attestation exists for the chain
+ */
+export interface HeightHash {
+  height: number;
+  hash: string;
+  exists: boolean;
 }
 
 export interface ChainInfoProvider {
@@ -42,19 +83,14 @@ interface AttestationBounds {
   isAttested: boolean;
 }
 
-export interface ChainInfo {
-  chainKey: number;
-  chainId: number;
-  chainName: string;
-  chainEncoding: number;
-}
-
-export interface HeightHash {
-  height: number;
-  hash: string;
-  exists: boolean;
-}
-
+/**
+ * Implementation of ChainInfoProvider using the ChainInfo precompile contract deployed on Creditcoin.
+ *
+ * This provider interacts with the precompile contract to fetch chain information, attestation bounds,
+ * and other relevant data needed for proof generation and verification.
+ *
+ * Unless specified otherwise, it uses the default precompile address.
+ */
 export class PrecompileChainInfoProvider implements ChainInfoProvider {
   private chainInfoContract: Contract;
 
@@ -73,6 +109,21 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * @param height - The block height to query
    * @returns Promise resolving to ContinuityBounds containing lower and upper bounds, or null bounds if not attested
    * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   * const height = 100; // Example block height
+   *
+   * const continuityBounds = await chainInfoProvider.getContinuityBounds(chainKey, height);
+   * // Results in:
+   * // {
+   * //   lowerBound: { blockNumber: 95, digest: '0xabc...' } | null,
+   * //   upperBound: { blockNumber: 105, digest: '0xdef...' } | null
+   * // }
+   * ```
    */
   public async getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds> {
     try {
@@ -120,7 +171,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
         lowerBound: lowerBounds,
         upperBound: upperBounds,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }
   }
@@ -129,6 +180,19 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * Retrieves information about all supported source chains on the creditcoin network
    * @returns Promise resolving to an array of ChainInfo objects containing chain details
    * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const supportedChains = await chainInfoProvider.getSupportedChains();
+   * // Results in:
+   * // [
+   * //   { chainKey: 1, chainId: 1, chainName: 'Ethereum Mainnet', chainEncoding: 1 },
+   * //   { chainKey: 2, chainId: 56, chainName: 'Binance Smart Chain', chainEncoding: 1 },
+   * //   ...
+   * // ]
+   * ```
    */
   public async getSupportedChains(): Promise<ChainInfo[]> {
     try {
@@ -164,7 +228,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
       });
 
       return chainInfo;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }
   }
@@ -174,6 +238,21 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @returns Promise resolving to HeightHash object containing height, hash, and existence status
    * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   *
+   * const latestAttestation = await chainInfoProvider.getLatestAttestedHeightAndHash(chainKey);
+   * // Results in:
+   * // {
+   * //   height: 150,
+   * //   hash: '0xabc123...',
+   * //   exists: true
+   * // }
+   * ```
    */
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
     try {
@@ -195,16 +274,30 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
       };
 
       return heightHashObj;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }
   }
 
   /**
-   * Retrieves the genesis height for attestations on a specific chain
+   * Retrieves the genesis height for attestations on a specific chain. **If the chain is not supported or
+   * it has no configured genesis height, the method will return 0.**
+   *
+   * To check if a chain is supported, use the `getSupportedChains` method.
+   *
    * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @returns Promise resolving to the genesis height as a bigint
    * @throws Error if the contract call fails or returns invalid data
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   *
+   * const genesisHeight = await chainInfoProvider.getAttestationGenesisHeight(chainKey);
+   * // Results in:
+   * // 100
+   * ```
    */
   public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
     try {
@@ -216,7 +309,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
       }
 
       return Number(genesisHeight);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }
   }
@@ -229,6 +322,22 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * @param waitTimeoutMs - Maximum time to wait before timing out (default: 60000ms)
    * @returns Promise that resolves when the target height is attested
    * @throws Error if the timeout is exceeded before the height is attested
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const supportedChains = await chainInfoProvider.getSupportedChains();
+   * const chainKey = supportedChains[0].chainKey;
+   * const targetHeight = 10;
+   *
+   * // Wait until the target height is attested on the specified chain before proving
+   * await chainInfoProvider.waitUntilHeightAttested(chainKey, targetHeight);
+   * // After the method resolves, transactions up to targetHeight can be safely proven
+   * // with the block prover, using either the provided `PrecompileBlockProver`
+   * // or through direct calls to the precompile contract.
+   * console.log(`Height ${targetHeight} is now attested on chain key ${chainKey}`);
+   * ```
    */
   public async waitUntilHeightAttested(
     chainKey: number,

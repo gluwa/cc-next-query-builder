@@ -34,9 +34,7 @@ class ApiClient {
 
 /**
  * Proof generator that fetches proofs from a remote API.
- *
  * It uses an HTTP client to communicate with the API server.
- *
  * Timeout can be configured for the HTTP requests.
  *
  * Server is expected to expose an endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
@@ -60,6 +58,35 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    *
    * @param transactionHash - The hash of the transaction to generate a proof for, as a hex string.
    * @returns A promise that resolves to the result of the proof generation
+   * @throws Error if the API request fails
+   *
+   * @example
+   * ```typescript
+   * const chainKey = 2; // Example chain key
+   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * // Results in:
+   * // {
+   * //   success: true,
+   * //   data: {
+   * //     chainKey: 2,
+   * //     headerNumber: 123456,
+   * //     txIndex: 0,
+   * //     txHash: '0xabc...',
+   * //     txBytes: '0x123...',
+   * //     continuityProof: {
+   * //       lowerEndpointDigest: '0xdef...',
+   * //       roots: [ '0x789...', '0x456...', ... ]
+   * //     },
+   * //     merkleProof: {
+   * //       root: '0x789...',
+   * //       siblings: [ { hash: '0xabc...', isLeft: true }, ... ]
+   * //     cached: false,
+   * //     generatedAt: '2024-01-01T00:00:00Z'
+   * //   }
+   * // }
+   * ```
    */
   public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
     try {

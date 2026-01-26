@@ -1,6 +1,7 @@
-import { ProofGenerationResult, ProofGenerator, chainInfo } from '..';
+import { ProofGenerationResult, ProofGenerator } from '..';
+import { ChainInfoProvider } from '../../chain-info';
 
-import { abiEncode, EncodingVersion } from '../../encodings';
+import { abiEncode, EncodingVersion } from '../../encoding';
 
 import { ContinuityProofBuilder } from './continuity-proof';
 import { KeccakMerkleTree } from './merkle';
@@ -8,7 +9,7 @@ import { BlockProvider } from './block-provider';
 
 // Re-export for easier access
 export * as blockProvider from './block-provider';
-export { EncodingVersion } from '../../encodings';
+export { EncodingVersion } from '../../encoding';
 
 /**
  * RawProofGenerator generates raw proofs for a given transaction.
@@ -20,7 +21,7 @@ export { EncodingVersion } from '../../encodings';
  */
 export class RawProofGenerator implements ProofGenerator {
   private blockProvider: BlockProvider;
-  private chainInfoProvider: chainInfo.ChainInfoProvider;
+  private chainInfoProvider: ChainInfoProvider;
 
   private chainKey: number;
   private builder: ContinuityProofBuilder;
@@ -28,7 +29,7 @@ export class RawProofGenerator implements ProofGenerator {
   constructor(
     chainKey: number,
     blockProvider: BlockProvider,
-    chainInfoProvider: chainInfo.ChainInfoProvider,
+    chainInfoProvider: ChainInfoProvider,
     encoding: EncodingVersion,
   ) {
     this.blockProvider = blockProvider;
