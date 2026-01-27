@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { Block, WebSocketProvider, TransactionReceipt } from 'ethers';
 import { abiEncode } from '../encoding/abi';
+import { getTransactionWithRaw } from '../encoding';
 
 /**
  * Gets all transaction receipts for a given block using regular Infura/compatible RPC format.
@@ -33,7 +34,7 @@ async function encodeTransaction(
   receipt: TransactionReceipt | null,
 ): Promise<string> {
   // 80 credits
-  const transaction = await provider.getTransaction(txHash);
+  const transaction = await getTransactionWithRaw(provider, txHash);
 
   if (receipt === null) {
     // 80 credits

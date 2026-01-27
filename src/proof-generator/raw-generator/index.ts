@@ -45,9 +45,9 @@ export class RawProofGenerator implements ProofGenerator {
       return { success: false, error: `Transaction ${transactionHash} not found` };
     }
 
-    const txIndex = tx.index;
-    const blockNumber = tx.blockNumber;
-    const blockHash = tx.blockHash;
+    const txIndex = tx.formatted.index;
+    const blockNumber = tx.formatted.blockNumber;
+    const blockHash = tx.formatted.blockHash;
 
     // If transaction is pending, we cannot generate a proof since it's not in a block yet which could be attested
     if (!blockNumber || !blockHash) {
@@ -66,10 +66,10 @@ export class RawProofGenerator implements ProofGenerator {
     // to build the merkle proof of the block
     const transactions = await Promise.all(
       block.transactions.map(async (txHash) => {
-        return await block.getTransaction(txHash);
+        return await this.blockProvider.getTransaction(txHash);
       }) || [],
     );
-    const orderedTransactions = transactions.sort((a, b) => a.index - b.index);
+    const orderedTransactions = transactions.sort((a, b) => a!.formatted.index - b!.formatted.index);
 
     // If for some reason the counts don't match, error out
     if (orderedTransactions.length !== orderedReceipts.length) {
@@ -83,7 +83,7 @@ export class RawProofGenerator implements ProofGenerator {
     // which will be the leaves of the merkle tree
     const encodedTx = orderedTransactions.map((txData, idx) => {
       // ABI encoded transaction + receipt
-      const encoded = abiEncode(txData, orderedReceipts[idx], EncodingVersion.V1);
+      const encoded = abiEncode(txData!, orderedReceipts[idx], EncodingVersion.V1);
 
       return encoded.abi;
     });

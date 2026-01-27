@@ -1,11 +1,12 @@
-import { Block, JsonRpcApiProvider, TransactionReceipt, TransactionResponse } from 'ethers';
+import { Block, JsonRpcApiProvider, TransactionReceipt } from 'ethers';
+import { getTransactionWithRaw, TransactionWithRaw } from '../../encoding';
 
 /**
  * Abstract interface for an Ethereum-based block provider.
  */
 export interface BlockProvider {
   getBlockNumber(): Promise<number>;
-  getTransaction(transactionHash: string): Promise<TransactionResponse | null>;
+  getTransaction(transactionHash: string): Promise<TransactionWithRaw | null>;
   getBlockWithReceipts(blockNumber: number): Promise<{ block: Block; receipts: TransactionReceipt[] }>;
 }
 
@@ -25,8 +26,8 @@ export class SimpleBlockProvider implements BlockProvider {
     return this.rpc.getBlockNumber();
   }
 
-  public async getTransaction(transactionHash: string): Promise<TransactionResponse | null> {
-    return this.rpc.getTransaction(transactionHash);
+  public async getTransaction(transactionHash: string): Promise<TransactionWithRaw | null> {
+    return getTransactionWithRaw(this.rpc, transactionHash);
   }
 
   public async getBlockWithReceipts(blockNumber: number): Promise<{ block: Block; receipts: TransactionReceipt[] }> {

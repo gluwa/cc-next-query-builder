@@ -12,9 +12,10 @@ import { EncodingVersion } from '../../encoding/abi';
 import { QueryBuilderForFunction } from './QueryBuilderForFunction';
 import { QueryBuilderForEvent } from './QueryBuilderForEvent';
 import { computeAllOffsets } from './offset-utils';
+import { getTransactionWithRaw, TransactionWithRaw } from '../../encoding';
 
 export class QueryBuilder {
-  private tx!: TransactionResponse;
+  private tx!: TransactionWithRaw;
   private rx!: TransactionReceipt;
   private abiProvider?: (contractAddress: string) => Promise<any>;
   private selectedFields: { offset: number; size: number }[] = [];
@@ -23,7 +24,7 @@ export class QueryBuilder {
   private mappedOffsets: Map<QueryableFields, FieldMetadata>;
   private encoding: EncodingVersion;
 
-  private constructor(tx: TransactionResponse, rx: TransactionReceipt, encoding: EncodingVersion = EncodingVersion.V1) {
+  private constructor(tx: TransactionWithRaw, rx: TransactionReceipt, encoding: EncodingVersion = EncodingVersion.V1) {
     this.tx = tx;
     this.rx = rx;
     this.encoding = encoding;
@@ -39,7 +40,7 @@ export class QueryBuilder {
     transactionHash: string,
     encoding: EncodingVersion = EncodingVersion.V1,
   ): Promise<QueryBuilder> {
-    const tx = await rpc.getTransaction(transactionHash);
+    const tx = await getTransactionWithRaw(rpc, transactionHash);
     if (!tx) throw new Error(`could not find a transaction by hash ${transactionHash}`);
 
     const rx = await rpc.getTransactionReceipt(transactionHash);
@@ -49,7 +50,7 @@ export class QueryBuilder {
   }
 
   static createFromTransaction(
-    tx: TransactionResponse,
+    tx: TransactionWithRaw,
     rx: TransactionReceipt,
     encoding: EncodingVersion = EncodingVersion.V1,
   ): QueryBuilder {
@@ -87,7 +88,7 @@ export class QueryBuilder {
 
   addStaticField(field: QueryableFields) {
     const offset = this.mappedOffsets.get(field);
-    if (!offset) throw new Error(`Could not find field ${field} in transacton type ${this.tx.type}`);
+    if (!offset) throw new Error(`Could not find field ${field} in transacton type ${this.tx.formatted.type}`);
 
     if (offset.isDynamic)
       throw new Error(`Only static fields can be added with this method, ${field} is a dynamic field ${offset.type}`);
@@ -233,10 +234,10 @@ export class QueryBuilder {
   }
 
   async functionBuilder(functionNameOrSignature: string, configurator: (builder: QueryBuilderForFunction) => void) {
-    const calldata = this.tx.data;
+    const calldata = this.tx.formatted.data;
     if (calldata == '0x') throw new Error(`attempting to add a function argument for a transaction with no calldata`);
 
-    const contractAddress = this.tx.to;
+    const contractAddress = this.tx.formatted.to;
     if (!contractAddress)
       throw new Error(
         `there is no to address, which means its not an interaction with a contract, probably a contract deployment?`,
@@ -252,14 +253,14 @@ export class QueryBuilder {
     let builder = new QueryBuilderForFunction(
       this.mappedOffsets.get(QueryableFields.TxData)!,
       matchedFunction,
-      this.tx,
+      this.tx.formatted,
     );
     configurator(builder);
     this.selectedFields = [...this.selectedFields, ...builder.fields];
   }
 
   addFunctionSignature() {
-    if (this.tx.data == '0x') throw new Error(`this transaction has no calldata`);
+    if (this.tx.formatted.data == '0x') throw new Error(`this transaction has no calldata`);
 
     const dataField = this.mappedOffsets.get(QueryableFields.TxData);
     this.selectedFields.push({ offset: dataField!.offset, size: 4 });

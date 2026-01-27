@@ -5,6 +5,25 @@ import { QueryBuilder } from '../../src/query-builder/abi/QueryBuilder';
 import { QueryableFields } from '../../src/query-builder/abi/models';
 import { ForkedReader } from '../../src/query-builder/common/ForkedReader';
 import { ERC20_BURN_ABI, LOAN_PAYMENT_ABI } from '../common/const';
+import { getTransactionWithRaw } from '../../src/encoding/common';
+
+test('Transaction yParity check', async () => {
+  const rpc = 'https://sepolia-proxy-rpc.creditcoin.network';
+  const provider = new JsonRpcProvider(rpc);
+
+  const transactionHash = '0x39dfab8a4143253e7b9c2d87845bd57ee2e01187b68599c3652e359174bafb25';
+  const transaction = await getTransactionWithRaw(provider, transactionHash);
+
+  expect(transaction !== null).toBe(true);
+  expect(transaction!.formatted.authorizationList?.length).toBe(1);
+  expect(transaction!.raw.authorizationList?.length).toBe(1);
+
+  const formattedYParity = transaction!.formatted.authorizationList?.[0].signature.yParity;
+  const rawYParity = transaction!.raw.authorizationList?.[0].yParity;
+
+  expect(formattedYParity).toBe(0);
+  expect(rawYParity).toBe(27);
+});
 
 test('Query Builder should be able to build a query', async () => {
   const rpc = 'https://sepolia-proxy-rpc.creditcoin.network';
@@ -12,7 +31,7 @@ test('Query Builder should be able to build a query', async () => {
 
   // ERC20 Burn
   const transactionHash = '0xc990ce703dd3ca83429c302118f197651678de359c271f205b9083d4aa333aae'; //"0x0b50111d729c00bac4a99702b2c88e425321c8f8214bc3272072c730d5ff9ad2";
-  const transaction = await provider.getTransaction(transactionHash);
+  const transaction = await getTransactionWithRaw(provider, transactionHash);
   const receipt = await provider.getTransactionReceipt(transactionHash);
   const builder = QueryBuilder.createFromTransaction(transaction!, receipt!);
   const abiEncoded = abiEncode(transaction!, receipt!);
@@ -130,7 +149,7 @@ test('Build query from transactions with multiple events', async () => {
   const provider = new JsonRpcProvider(rpc);
 
   const transactionHash = '0x202b9b1d689578cf7dd7b279b3c9cb02f47cef7b44b6fa1650ab67977f86cb11'; //"0x0b50111d729c00bac4a99702b2c88e425321c8f8214bc3272072c730d5ff9ad2";
-  const transaction = await provider.getTransaction(transactionHash);
+  const transaction = await getTransactionWithRaw(provider, transactionHash);
   const receipt = await provider.getTransactionReceipt(transactionHash);
   const builder = QueryBuilder.createFromTransaction(transaction!, receipt!);
   const abiEncoded = abiEncode(transaction!, receipt!);

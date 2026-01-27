@@ -195,7 +195,16 @@ export class ContinuityProofBuilder {
     // First we need to get the block and receipts for the transaction blocks
     const blocksWithReceipt = await Promise.all(
       blockNumbers.map(async (bn) => {
-        return await this.blockProvider.getBlockWithReceipts(bn);
+        const { block, receipts } = await this.blockProvider.getBlockWithReceipts(bn);
+
+        const transactions = await Promise.all(
+          block.transactions.map(async (txHash) => {
+            const transaction = await this.blockProvider.getTransaction(txHash);
+            return transaction!;
+          }) || [],
+        );
+
+        return { block, transactions, receipts };
       }) || [],
     );
 
@@ -204,9 +213,10 @@ export class ContinuityProofBuilder {
 
     let prevDigest = lowerDigest;
     // Now we need to get the continuity proof for the blocks
-    const continuityBlocks = orderedBlocksWithReceipt.map(({ block, receipts }) => {
+    const continuityBlocks = orderedBlocksWithReceipt.map(({ block, transactions, receipts }) => {
       const orderedReceipts = receipts.sort((a, b) => a.index - b.index);
-      const merkleRoot = computeMerkleRootOfBlock(block, orderedReceipts, this.encoding);
+      const orderedTransactions = transactions.sort((a, b) => a!.formatted.index - b!.formatted.index);
+      const merkleRoot = computeMerkleRootOfBlock(orderedTransactions, orderedReceipts, this.encoding);
       const digest = computeDigestOf(block.number, merkleRoot, prevDigest);
       const continuityBlock = new AttestationBlock(block.number, merkleRoot, digest, prevDigest);
 
