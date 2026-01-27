@@ -8,7 +8,7 @@ import {
   isHexString,
 } from 'ethers';
 import { FieldMetadata, QueryableFields } from './models';
-import { EncodingVersion } from '../../encodings/abi';
+import { EncodingVersion } from '../../encoding/abi';
 import { QueryBuilderForFunction } from './QueryBuilderForFunction';
 import { QueryBuilderForEvent } from './QueryBuilderForEvent';
 import { computeAllOffsets } from './offset-utils';

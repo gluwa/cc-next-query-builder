@@ -1,5 +1,5 @@
 import { MappedEncodedFields } from '../models';
-import { EncodingVersion } from '../../../encodings/abi';
+import { EncodingVersion } from '../../../encoding/abi';
 import { getMappedFieldsForType as getMappedFieldsForTypeV1 } from './v1';
 
 export function getAllFieldsForTransaction(type: number, encoding: EncodingVersion): MappedEncodedFields {

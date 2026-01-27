@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { Block, WebSocketProvider, TransactionReceipt } from 'ethers';
-import { abiEncode } from '../encodings/abi';
+import { abiEncode } from '../encoding/abi';
 
 /**
  * Gets all transaction receipts for a given block using regular Infura/compatible RPC format.

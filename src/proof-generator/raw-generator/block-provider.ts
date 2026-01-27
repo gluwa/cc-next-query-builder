@@ -1,7 +1,7 @@
 import { Block, JsonRpcApiProvider, TransactionReceipt, TransactionResponse } from 'ethers';
 
 /**
- * Abstract interface for an Ethereum block provider.
+ * Abstract interface for an Ethereum-based block provider.
  */
 export interface BlockProvider {
   getBlockNumber(): Promise<number>;

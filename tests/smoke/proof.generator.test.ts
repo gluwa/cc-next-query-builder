@@ -1,18 +1,9 @@
 import { test, expect } from '@jest/globals';
-import {
-  Block,
-  JsonRpcProvider,
-  Contract,
-  Wallet,
-  InterfaceAbi,
-  TransactionReceipt,
-  TransactionResponse,
-} from 'ethers';
+import { Block, JsonRpcProvider, TransactionReceipt, TransactionResponse } from 'ethers';
 
-import * as proof from '../../src/proof-generator';
-import { EncodingVersion } from '../../src/encodings';
+import { proofGenerator, chainInfo, blockProver } from '../../src';
+import { EncodingVersion } from '../../src/encoding';
 
-import BlockProverABI from '../abis/block_prover.json';
 import { keccak256 } from 'ethers';
 
 interface MockTransaction {
@@ -59,7 +50,7 @@ interface MockBlock extends Block {
   getTransaction(indexOrHash: number | string): Promise<TransactionResponse>;
 }
 
-class MockBlockProvider implements proof.raw.blockProvider.BlockProvider {
+class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvider {
   private blockNumber: number = 1;
 
   private transactions: Map<string, TransactionResponse> = new Map();
@@ -160,9 +151,9 @@ class MockBlockProvider implements proof.raw.blockProvider.BlockProvider {
   }
 }
 
-class MockContinuityProvider implements proof.chainInfo.ChainInfoProvider {
-  private upperBound: proof.chainInfo.ContinuityBound | null = null;
-  private lowerBound: proof.chainInfo.ContinuityBound | null = null;
+class MockContinuityProvider implements chainInfo.ChainInfoProvider {
+  private upperBound: chainInfo.ContinuityBound | null = null;
+  private lowerBound: chainInfo.ContinuityBound | null = null;
 
   public setUpperBound(blockNumber: number) {
     this.upperBound = {
@@ -178,14 +169,14 @@ class MockContinuityProvider implements proof.chainInfo.ChainInfoProvider {
     };
   }
 
-  public async getContinuityBounds(_chainKey: number, _height: number): Promise<proof.chainInfo.ContinuityBounds> {
+  public async getContinuityBounds(_chainKey: number, _height: number): Promise<chainInfo.ContinuityBounds> {
     return { lowerBound: this.lowerBound, upperBound: this.upperBound };
   }
 
-  public async getSupportedChains(): Promise<proof.chainInfo.ChainInfo[]> {
+  public async getSupportedChains(): Promise<chainInfo.ChainInfo[]> {
     throw new Error('Method not implemented.');
   }
-  public async getLatestAttestedHeightAndHash(chainKey: number): Promise<proof.chainInfo.HeightHash> {
+  public async getLatestAttestedHeightAndHash(chainKey: number): Promise<chainInfo.HeightHash> {
     throw new Error('Method not implemented.');
   }
   public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
@@ -218,7 +209,7 @@ test('RawProofGenerator: should return proof', async () => {
   const block = await blockProvider.getBlockWithReceipts(11);
   const txHash = block.block.transactions[0];
 
-  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -232,7 +223,7 @@ test('RawProofGenerator: should return error for non-existent transaction', asyn
   const blockProvider = new MockBlockProvider();
   const continuityProvider = new MockContinuityProvider();
 
-  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
   const result = await generator.generateProof(transactionHash);
@@ -260,7 +251,7 @@ test('RawProofGenerator: return error if no lower bound', async () => {
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -290,7 +281,7 @@ test('RawProofGenerator: return error if no upper bound', async () => {
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -322,7 +313,7 @@ test('RawProofGenerator: return error if upper bound is above current block heig
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proof.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -338,12 +329,12 @@ test.skip('E2E ProofGenerator integration test', async () => {
   // Initialize block provider connected to local source ethereum chain
   const sourceChainRpc = 'http://localhost:8545';
   const ethProvider = new JsonRpcProvider(sourceChainRpc);
-  const blockProvider = new proof.raw.blockProvider.SimpleBlockProvider(ethProvider);
+  const blockProvider = new proofGenerator.raw.blockProvider.SimpleBlockProvider(ethProvider);
 
   // Continuity provider using precompile contract from local creditcoin chain
   const ccRpc = 'http://localhost:9944';
   const ccProvider = new JsonRpcProvider(ccRpc);
-  const chainInfoProvider = new proof.chainInfo.PrecompileChainInfoProvider(ccProvider);
+  const chainInfoProvider = new chainInfo.PrecompileChainInfoProvider(ccProvider);
 
   const chainInfos = await chainInfoProvider.getSupportedChains();
   console.log('Supported chains from continuity provider:', chainInfos);
@@ -357,52 +348,87 @@ test.skip('E2E ProofGenerator integration test', async () => {
   // NOTE: Replace with your test chain key
   const chainKey = 2;
 
-  // We await just to showcase the waitUntilHeightAttested method, its not really needed here
-  console.log(`Waiting for block ${latestHeightHash.height + 10} to be attestated...`);
-  await chainInfoProvider.waitUntilHeightAttested(chainKey, latestHeightHash.height + 10);
-
   // Initialize BlockProver contract instance from local creditcoin chain
-  const blockProverContractAddress = '0x0000000000000000000000000000000000000FD2';
-  const contractABI = BlockProverABI as unknown as InterfaceAbi;
-  const blockProverContract = new Contract(blockProverContractAddress, contractABI, ccProvider);
+  const prover = new blockProver.PrecompileBlockProver(ccProvider);
 
   // NOTE: Replace with a valid transaction hash from your local source chain
-  const transactionHash = '0xd9aea5b9c64682c81d8f4077bae5e457f3babc885ca583dbc0608c5d2da7b1c3';
+  const txHash1 = '0x2d83504d496cb9e4a7f801c7a516aa9b6144b73e39e52f8c2934ae20e1e83c74';
+  const txBlock1 = await ethProvider.getTransaction(txHash1).then((tx) => tx?.blockNumber);
+  const txHash2 = '0x6fe777442b70a5511f3c443176ae860e50445bd93b663711717996a70c5022ab';
+  const txBlock2 = await ethProvider.getTransaction(txHash2).then((tx) => tx?.blockNumber);
+
+  console.log(`Transaction 1 is in block ${txBlock1}`);
+  console.log(`Transaction 2 is in block ${txBlock2}`);
+
+  // We await the highest block to be attested before generating proofs
+  console.log(`Waiting for block ${latestHeightHash.height} to be attestated...`);
+  await chainInfoProvider.waitUntilHeightAttested(chainKey, Math.max(txBlock1!, txBlock2!));
 
   // First we test with the raw proof generator
-  const rawProofGenerator = new proof.raw.RawProofGenerator(
+  const rawProofGenerator = new proofGenerator.raw.RawProofGenerator(
     chainKey,
     blockProvider,
     chainInfoProvider,
     EncodingVersion.V1,
   );
-  const rawProofResult = await rawProofGenerator.generateProof(transactionHash);
+  const rawProofResult = await rawProofGenerator.generateProof(txHash1);
   expect(rawProofResult.success).toBe(true);
 
   const proofData = rawProofResult.data!;
-  const proveResultRaw = await blockProverContract.verify(
+  const proveResultRaw = await prover.verifySingle(
     proofData.chainKey,
     proofData.headerNumber,
     proofData.txBytes,
     proofData.merkleProof,
     proofData.continuityProof,
+    true,
   );
   expect(proveResultRaw).toBe(true);
 
   // Then we test with the proof generator API server
   const apiServerUrl = 'http://localhost:3100';
   const requestTimeout = 5000; // 5 seconds
-  const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl, requestTimeout);
-  const apiProofResult = await apiProvider.generateProof(transactionHash);
-  expect(apiProofResult.success).toBe(true);
+  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl, requestTimeout);
+  const apiProofResult_1 = await apiProvider.generateProof(txHash1);
+  expect(apiProofResult_1.success).toBe(true);
 
-  const apiProofData = apiProofResult.data!;
-  const proveResultApi = await blockProverContract.verify(
-    apiProofData.chainKey,
-    apiProofData.headerNumber,
-    apiProofData.txBytes,
-    apiProofData.merkleProof,
-    apiProofData.continuityProof,
+  const apiProofData_1 = apiProofResult_1.data!;
+
+  const a: [number, proofGenerator.ContinuityProof][] = [apiProofData_1].map((data) => [
+    data.headerNumber,
+    data.continuityProof,
+  ]);
+
+  const proveResultApi_1 = await prover.verifySingle(
+    apiProofData_1.chainKey,
+    apiProofData_1.headerNumber,
+    apiProofData_1.txBytes,
+    apiProofData_1.merkleProof,
+    apiProofData_1.continuityProof,
+    true,
   );
-  expect(proveResultApi).toBe(true);
+  expect(proveResultApi_1).toBe(true);
+
+  const apiProofResult_2 = await apiProvider.generateProof(txHash2);
+  expect(apiProofResult_2.success).toBe(true);
+  const apiProofData_2 = apiProofResult_2.data!;
+
+  const numberedProofs: [number, proofGenerator.ContinuityProof][] = [
+    [apiProofData_1.headerNumber, apiProofData_1.continuityProof],
+    [apiProofData_2.headerNumber, apiProofData_2.continuityProof],
+  ];
+
+  const mergedProof = proofGenerator.mergeProofs(numberedProofs);
+
+  console.log(JSON.stringify(mergedProof, null, 2));
+
+  const proveResultApi_2 = await prover.verifyBatch(
+    apiProofData_1.chainKey,
+    [apiProofData_1.headerNumber, apiProofData_2.headerNumber],
+    [apiProofData_1.txBytes, apiProofData_2.txBytes],
+    [apiProofData_1.merkleProof, apiProofData_2.merkleProof],
+    mergedProof,
+    true,
+  );
+  expect(proveResultApi_2).toBe(true);
 }, 120_000);

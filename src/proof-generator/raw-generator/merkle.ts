@@ -2,7 +2,7 @@ import { Block, TransactionResponse, TransactionReceipt, keccak256, solidityPack
 
 import { MerkleProofEntry, TransactionMerkleProof } from '..';
 
-import { abiEncode, EncodingVersion } from '../../encodings';
+import { abiEncode, EncodingVersion } from '../../encoding';
 
 /**
  * Hashes two child nodes to produce their parent node in the Merkle tree.

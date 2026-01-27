@@ -1,7 +1,7 @@
 import { TransactionResponse, TransactionReceipt, AbiCoder, ParamType } from 'ethers';
 import { FieldMetadata, QueryableFields } from './models';
 import { computeAbiOffsets, WORD_SIZE } from './abi-utils';
-import { abiEncode, EncodingVersion } from '../../encodings/abi';
+import { abiEncode, EncodingVersion } from '../../encoding/abi';
 import { getAllFieldsForTransaction } from './encoding-mapping';
 
 /**

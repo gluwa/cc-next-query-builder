@@ -1,6 +1,6 @@
 import { test, expect } from '@jest/globals';
 import { hexlify, JsonRpcProvider, Log, LogDescription, ZeroAddress } from 'ethers';
-import { abiEncode } from '../../src/encodings/abi';
+import { abiEncode } from '../../src/encoding/abi';
 import { QueryBuilder } from '../../src/query-builder/abi/QueryBuilder';
 import { QueryableFields } from '../../src/query-builder/abi/models';
 import { ForkedReader } from '../../src/query-builder/common/ForkedReader';
