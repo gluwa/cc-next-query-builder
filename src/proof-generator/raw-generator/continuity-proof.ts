@@ -195,16 +195,7 @@ export class ContinuityProofBuilder {
     // First we need to get the block and receipts for the transaction blocks
     const blocksWithReceipt = await Promise.all(
       blockNumbers.map(async (bn) => {
-        const { block, receipts } = await this.blockProvider.getBlockWithReceipts(bn);
-
-        const transactions = await Promise.all(
-          block.transactions.map(async (txHash) => {
-            const transaction = await this.blockProvider.getTransaction(txHash);
-            return transaction!;
-          }) || [],
-        );
-
-        return { block, transactions, receipts };
+        return await this.blockProvider.getBlockWithReceipts(bn);
       }) || [],
     );
 

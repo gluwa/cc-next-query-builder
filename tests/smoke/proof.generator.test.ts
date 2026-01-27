@@ -54,7 +54,8 @@ class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvide
   private blockNumber: number = 1;
 
   private transactions: Map<string, TransactionWithRaw> = new Map();
-  private blocks: Map<number, { block: Block; receipts: TransactionReceipt[] }> = new Map();
+  private blocks: Map<number, { block: Block; transactions: TransactionWithRaw[]; receipts: TransactionReceipt[] }> =
+    new Map();
 
   constructor() {}
 
@@ -136,15 +137,13 @@ class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvide
         },
       } as MockBlock;
 
-      this.blocks.set(blockNumber, { block, receipts: block.receipts });
+      this.blocks.set(blockNumber, { block, transactions: [transactionWithRaw], receipts: block.receipts });
     }
   }
 
-  public addBlockWithReceipts(blockNumber: number, block: MockBlock) {
-    this.blocks.set(blockNumber, { block, receipts: block.receipts });
-  }
-
-  public async getBlockWithReceipts(blockNumber: number): Promise<{ block: Block; receipts: TransactionReceipt[] }> {
+  public async getBlockWithReceipts(
+    blockNumber: number,
+  ): Promise<{ block: Block; transactions: TransactionWithRaw[]; receipts: TransactionReceipt[] }> {
     const data = this.blocks.get(blockNumber);
     if (!data) {
       throw new Error(`Block ${blockNumber} not found`);
