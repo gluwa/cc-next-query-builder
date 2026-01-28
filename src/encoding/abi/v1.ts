@@ -156,7 +156,7 @@ function encodeAuthorizationList(
     entry.chainId,
     entry.address,
     entry.nonce,
-    BigInt(rawAuthorizationList![i].yParity),
+    rawAuthorizationList![i].yParity,
     entry.signature.r,
     entry.signature._s,
   ]);
