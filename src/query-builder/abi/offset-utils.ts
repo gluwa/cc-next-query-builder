@@ -3,6 +3,7 @@ import { FieldMetadata, QueryableFields } from './models';
 import { computeAbiOffsets, WORD_SIZE } from './abi-utils';
 import { abiEncode, EncodingVersion } from '../../encoding/abi';
 import { getAllFieldsForTransaction } from './encoding-mapping';
+import { TransactionWithRaw } from '../../encoding';
 
 /**
  * Recursively makes offsets absolute by adding baseOffset to field and all children
@@ -25,14 +26,14 @@ export function makeOffsetsAbsolute(field: FieldMetadata, baseOffset: number): F
  * @returns Map of field enums to their offset metadata, and flat array of computed offsets
  */
 export function computeAllOffsets(
-  tx: TransactionResponse,
+  tx: TransactionWithRaw,
   rx: TransactionReceipt,
   encoding: EncodingVersion = EncodingVersion.V1,
 ): { map: Map<QueryableFields, FieldMetadata>; computedOffsets: FieldMetadata[] } {
   const result = abiEncode(tx, rx, encoding);
 
   // Get explicit chunk definitions
-  const fieldMapping = getAllFieldsForTransaction(tx.type, encoding);
+  const fieldMapping = getAllFieldsForTransaction(tx.formatted.type, encoding);
   if (!fieldMapping.chunks) {
     throw new Error('Field mapping must use explicit chunks structure');
   }
@@ -125,7 +126,7 @@ export function computeAllOffsets(
     isDynamic: false,
     size: 1,
     children: [],
-    value: tx.type,
+    value: tx.formatted.type,
   });
 
   allFields.forEach((field, index) => {

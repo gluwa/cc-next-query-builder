@@ -1,6 +1,6 @@
 import { TransactionResponse, TransactionReceipt, AccessList, AbiCoder, Authorization } from 'ethers';
 import { addressOrZero } from '../utils';
-import { EncodingResult } from '..';
+import { EncodingResult, RawAuthorization, RawTransactionResponse, TransactionWithRaw } from '..';
 
 /**
  * Encodes common transaction fields that are shared across all transaction types
@@ -146,16 +146,19 @@ function getChunksForType3(tx: TransactionResponse, rx: TransactionReceipt): str
   return [chunk1, chunk2, chunk3, chunk4];
 }
 
-function encodeAuthorizationList(authorizationList: Array<Authorization> | null) {
+function encodeAuthorizationList(
+  authorizationList: Array<Authorization> | null,
+  rawAuthorizationList: Array<RawAuthorization> | null,
+) {
   if (authorizationList == null) return [];
 
-  return authorizationList.map((entry) => [
+  return authorizationList.map((entry, i) => [
     entry.chainId,
     entry.address,
     entry.nonce,
-    entry.signature.yParity,
+    rawAuthorizationList![i].yParity,
     entry.signature.r,
-    entry.signature.s,
+    entry.signature._s,
   ]);
 }
 
@@ -166,7 +169,7 @@ function encodeAuthorizationList(authorizationList: Array<Authorization> | null)
  * Chunk 3: Type-specific fields part 2 (authorizationList, yParity, r, s)
  * Chunk 4: Receipt fields (receiptStatus, receiptGasUsed, receiptLogs, receiptLogsBloom)
  */
-function getChunksForType4(tx: TransactionResponse, rx: TransactionReceipt): string[] {
+function getChunksForType4(tx: TransactionResponse, raw: RawTransactionResponse, rx: TransactionReceipt): string[] {
   const coder = AbiCoder.defaultAbiCoder();
 
   // Chunk 1: Common fields
@@ -181,7 +184,12 @@ function getChunksForType4(tx: TransactionResponse, rx: TransactionReceipt): str
   // Chunk 3: Type-specific fields part 2 (authorizationList, yParity, r, s)
   const chunk3 = coder.encode(
     ['tuple(uint256,address,uint64,uint8,uint256,uint256)[]', 'uint8', 'bytes32', 'bytes32'],
-    [encodeAuthorizationList(tx.authorizationList), tx.signature.yParity, tx.signature.r, tx.signature.s],
+    [
+      encodeAuthorizationList(tx.authorizationList, raw.authorizationList),
+      tx.signature.yParity,
+      tx.signature.r,
+      tx.signature.s,
+    ],
   );
 
   // Chunk 4: Receipt fields
@@ -321,20 +329,21 @@ function getTypesForType(txType: number): string[] {
 /**
  * Selects the appropriate chunk creation function based on transaction type
  */
-function getChunksForType(tx: TransactionResponse, rx: TransactionReceipt): string[] {
-  switch (tx.type) {
+function getChunksForType(tx: TransactionWithRaw, rx: TransactionReceipt): string[] {
+  switch (tx.formatted.type) {
     case 0:
-      return getChunksForType0(tx, rx);
+      return getChunksForType0(tx.formatted, rx);
     case 1:
-      return getChunksForType1(tx, rx);
+      return getChunksForType1(tx.formatted, rx);
     case 2:
-      return getChunksForType2(tx, rx);
+      return getChunksForType2(tx.formatted, rx);
     case 3:
-      return getChunksForType3(tx, rx);
+      return getChunksForType3(tx.formatted, rx);
     case 4:
-      return getChunksForType4(tx, rx);
+      // Only Type 4 uses authorization list so it's the only one that needs tx.raw
+      return getChunksForType4(tx.formatted, tx.raw, rx);
     default:
-      throw new Error(`Unsupported transaction type: ${tx.type}`);
+      throw new Error(`Unsupported transaction type: ${tx.formatted.type}`);
   }
 }
 
@@ -353,18 +362,18 @@ function getChunksForType(tx: TransactionResponse, rx: TransactionReceipt): stri
  * @param rx - Transaction receipt
  * @returns Object containing the encoded abi string and the types array
  */
-export function abiEncode(tx: TransactionResponse, rx: TransactionReceipt): EncodingResult {
+export function abiEncode(tx: TransactionWithRaw, rx: TransactionReceipt): EncodingResult {
   // Create chunks using explicit chunk creation (super explicit - no intermediate steps)
   const chunks = getChunksForType(tx, rx);
 
   // Build flat types array from chunk configuration for QueryBuilder compatibility
-  const types = getTypesForType(tx.type);
+  const types = getTypesForType(tx.formatted.type);
 
   // Encode as (uint8, bytes[]) where uint8 is the transaction type
   // This makes it easy to extract the type without full decoding
   // QueryBuilder needs to understand this structure to calculate offsets
   const coder = AbiCoder.defaultAbiCoder();
-  const abi = coder.encode(['uint8', 'bytes[]'], [tx.type, chunks]);
+  const abi = coder.encode(['uint8', 'bytes[]'], [tx.formatted.type, chunks]);
 
   return {
     types, // Flat types for QueryBuilder to understand field grouping

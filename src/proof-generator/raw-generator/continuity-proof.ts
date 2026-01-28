@@ -204,9 +204,10 @@ export class ContinuityProofBuilder {
 
     let prevDigest = lowerDigest;
     // Now we need to get the continuity proof for the blocks
-    const continuityBlocks = orderedBlocksWithReceipt.map(({ block, receipts }) => {
+    const continuityBlocks = orderedBlocksWithReceipt.map(({ block, transactions, receipts }) => {
       const orderedReceipts = receipts.sort((a, b) => a.index - b.index);
-      const merkleRoot = computeMerkleRootOfBlock(block, orderedReceipts, this.encoding);
+      const orderedTransactions = transactions.sort((a, b) => a!.formatted.index - b!.formatted.index);
+      const merkleRoot = computeMerkleRootOfBlock(orderedTransactions, orderedReceipts, this.encoding);
       const digest = computeDigestOf(block.number, merkleRoot, prevDigest);
       const continuityBlock = new AttestationBlock(block.number, merkleRoot, digest, prevDigest);
 

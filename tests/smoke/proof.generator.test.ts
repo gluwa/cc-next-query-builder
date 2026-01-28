@@ -2,7 +2,7 @@ import { test, expect } from '@jest/globals';
 import { Block, JsonRpcProvider, TransactionReceipt, TransactionResponse } from 'ethers';
 
 import { proofGenerator, chainInfo, blockProver } from '../../src';
-import { EncodingVersion } from '../../src/encoding';
+import { EncodingVersion, TransactionWithRaw } from '../../src/encoding';
 
 import { keccak256 } from 'ethers';
 
@@ -53,8 +53,9 @@ interface MockBlock extends Block {
 class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvider {
   private blockNumber: number = 1;
 
-  private transactions: Map<string, TransactionResponse> = new Map();
-  private blocks: Map<number, { block: Block; receipts: TransactionReceipt[] }> = new Map();
+  private transactions: Map<string, TransactionWithRaw> = new Map();
+  private blocks: Map<number, { block: Block; transactions: TransactionWithRaw[]; receipts: TransactionReceipt[] }> =
+    new Map();
 
   constructor() {}
 
@@ -66,7 +67,7 @@ class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvide
     return this.blockNumber;
   }
 
-  public async getTransaction(transactionHash: string): Promise<TransactionResponse | null> {
+  public async getTransaction(transactionHash: string): Promise<TransactionWithRaw | null> {
     return this.transactions.get(transactionHash) || null;
   }
 
@@ -117,7 +118,9 @@ class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvide
           s: '0x' + '00'.repeat(32),
         },
       } as MockTransaction as unknown as TransactionResponse;
-      this.transactions.set(transactionHash, transaction as unknown as TransactionResponse);
+      const raw = { authorizationList: [] };
+      const transactionWithRaw = new TransactionWithRaw(transaction, raw);
+      this.transactions.set(transactionHash, transactionWithRaw);
 
       const block: MockBlock = {
         number: blockNumber,
@@ -127,22 +130,20 @@ class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvide
         getTransaction: async (indexOrHash: number | string): Promise<TransactionResponse> => {
           if (typeof indexOrHash === 'number') {
             const txHash = transactions[indexOrHash];
-            return this.transactions.get(txHash)!;
+            return this.transactions.get(txHash)!.formatted;
           } else {
-            return this.transactions.get(indexOrHash)!;
+            return this.transactions.get(indexOrHash)!.formatted;
           }
         },
       } as MockBlock;
 
-      this.blocks.set(blockNumber, { block, receipts: block.receipts });
+      this.blocks.set(blockNumber, { block, transactions: [transactionWithRaw], receipts: block.receipts });
     }
   }
 
-  public addBlockWithReceipts(blockNumber: number, block: MockBlock) {
-    this.blocks.set(blockNumber, { block, receipts: block.receipts });
-  }
-
-  public async getBlockWithReceipts(blockNumber: number): Promise<{ block: Block; receipts: TransactionReceipt[] }> {
+  public async getBlockWithReceipts(
+    blockNumber: number,
+  ): Promise<{ block: Block; transactions: TransactionWithRaw[]; receipts: TransactionReceipt[] }> {
     const data = this.blocks.get(blockNumber);
     if (!data) {
       throw new Error(`Block ${blockNumber} not found`);

@@ -2,7 +2,7 @@ import { Block, TransactionResponse, TransactionReceipt, keccak256, solidityPack
 
 import { MerkleProofEntry, TransactionMerkleProof } from '..';
 
-import { abiEncode, EncodingVersion } from '../../encoding';
+import { abiEncode, EncodingVersion, TransactionWithRaw } from '../../encoding';
 
 /**
  * Hashes two child nodes to produce their parent node in the Merkle tree.
@@ -35,23 +35,23 @@ export const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000
 /**
  * Computes the Merkle root of a block's transactions using Keccak-256 hashing.
  *
- * The block **must have prefetchedTransactions populated**. And the receipts **must correspond
- * to the block's transactions and be ordered by transaction index**. Otherwise, the result will be **incorrect**.
+ * The receipts **must correspond to the transactions and be ordered by transaction index**.
+ * Otherwise, the result will be **incorrect**.
  *
- * @param block Block object with prefetchedTransactions populated
+ * @param transactions Array of transactions with raw data
  * @param receipts Transaction receipts corresponding to the block's transactions
  * @param encoding Encoding version to use for ABI encoding of transactions and receipts
  * @returns Merkle root of the block's transactions as a hex string of 32 bytes (H256 hash)
  */
 export function computeMerkleRootOfBlock(
-  block: Block,
+  transactions: TransactionWithRaw[],
   receipts: TransactionReceipt[],
   encoding: EncodingVersion,
 ): string {
   // Encode all transactions in the block
-  const leaves = block.prefetchedTransactions.map((transaction: TransactionResponse, index: number) => {
+  const leaves = transactions.map((tx, index) => {
     const receipt = receipts[index];
-    const result = abiEncode(transaction, receipt, encoding);
+    const result = abiEncode(tx, receipt, encoding);
 
     return result.abi;
   });

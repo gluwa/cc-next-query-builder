@@ -5,6 +5,34 @@ import { QueryBuilder } from '../../src/query-builder/abi/QueryBuilder';
 import { QueryableFields } from '../../src/query-builder/abi/models';
 import { ForkedReader } from '../../src/query-builder/common/ForkedReader';
 import { ERC20_BURN_ABI, LOAN_PAYMENT_ABI } from '../common/const';
+import { getTransactionWithRaw } from '../../src/encoding/common';
+
+test('Transaction yParity check', async () => {
+  const rpc = 'https://sepolia-proxy-rpc.creditcoin.network';
+  const provider = new JsonRpcProvider(rpc);
+
+  const transactionHashes = [
+    '0x39dfab8a4143253e7b9c2d87845bd57ee2e01187b68599c3652e359174bafb25',
+    '0x5a68c9ff8f627b95e8326c909ba853bf831b558668c6521f80fc3af448a0947f',
+    '0xa56d8e39403418d40435a5217ae5434a138f3dfd641367a4f8aba7a235ee49b0',
+    '0xb8cf2e7b8be95b31b65d278b3703cf60e4bbf46193aa40d2bf5b991aad048e69',
+    '0x87f52be065ab3343b66923652eca76d01245e726975c87ff04480d5dc8a4df8a',
+  ];
+
+  for (const txHash of transactionHashes) {
+    const transaction = await getTransactionWithRaw(provider, txHash);
+
+    expect(transaction !== null).toBe(true);
+    expect(transaction!.formatted.authorizationList?.length).toBe(1);
+    expect(transaction!.raw.authorizationList?.length).toBe(1);
+
+    const formattedYParity = transaction!.formatted.authorizationList?.[0].signature.yParity;
+    const rawYParity = transaction!.raw.authorizationList?.[0].yParity;
+
+    expect(formattedYParity).toBe(0);
+    expect(rawYParity).toBe(27);
+  }
+}, 20_000);
 
 test('Query Builder should be able to build a query', async () => {
   const rpc = 'https://sepolia-proxy-rpc.creditcoin.network';
@@ -12,7 +40,7 @@ test('Query Builder should be able to build a query', async () => {
 
   // ERC20 Burn
   const transactionHash = '0xc990ce703dd3ca83429c302118f197651678de359c271f205b9083d4aa333aae'; //"0x0b50111d729c00bac4a99702b2c88e425321c8f8214bc3272072c730d5ff9ad2";
-  const transaction = await provider.getTransaction(transactionHash);
+  const transaction = await getTransactionWithRaw(provider, transactionHash);
   const receipt = await provider.getTransactionReceipt(transactionHash);
   const builder = QueryBuilder.createFromTransaction(transaction!, receipt!);
   const abiEncoded = abiEncode(transaction!, receipt!);
@@ -130,7 +158,7 @@ test('Build query from transactions with multiple events', async () => {
   const provider = new JsonRpcProvider(rpc);
 
   const transactionHash = '0x202b9b1d689578cf7dd7b279b3c9cb02f47cef7b44b6fa1650ab67977f86cb11'; //"0x0b50111d729c00bac4a99702b2c88e425321c8f8214bc3272072c730d5ff9ad2";
-  const transaction = await provider.getTransaction(transactionHash);
+  const transaction = await getTransactionWithRaw(provider, transactionHash);
   const receipt = await provider.getTransactionReceipt(transactionHash);
   const builder = QueryBuilder.createFromTransaction(transaction!, receipt!);
   const abiEncoded = abiEncode(transaction!, receipt!);
