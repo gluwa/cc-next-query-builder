@@ -127,7 +127,10 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds> {
     try {
-      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height);
+      // Measured on testnet (~37000), added some buffer
+      const gasLimit = 70_000;
+
+      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height, { gasLimit });
 
       // Validate bounds structure before casting
       if (!bounds || typeof bounds !== 'object') {
@@ -196,7 +199,10 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getSupportedChains(): Promise<ChainInfo[]> {
     try {
-      const chains = await this.chainInfoContract.get_supported_chains();
+      // Measured on testnet (~24000), added some buffer
+      const gasLimit = 38_000;
+
+      const chains = await this.chainInfoContract.get_supported_chains({ gasLimit });
 
       // Validate contract output structure before casting
       if (!chains || typeof chains !== 'object') {
@@ -256,7 +262,10 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
     try {
-      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey);
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey, { gasLimit });
 
       // Validate bounds structure before casting
       if (!heightHash || typeof heightHash !== 'object') {
@@ -301,7 +310,10 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
     try {
-      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(chainKey);
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(gasLimit);
 
       // Validate output structure before returning
       if (typeof genesisHeight !== 'bigint') {

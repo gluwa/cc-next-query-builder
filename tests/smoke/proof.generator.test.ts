@@ -260,7 +260,7 @@ test('RawProofGenerator: return error if no lower bound', async () => {
   // Expect an error since lower bound is missing
   expect(result.success).toBe(false);
   expect(result.error).toBe(
-    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper bounds',
+    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper continuity bounds',
   );
 });
 
@@ -290,7 +290,7 @@ test('RawProofGenerator: return error if no upper bound', async () => {
   // Expect an error since upper bound is missing
   expect(result.success).toBe(false);
   expect(result.error).toBe(
-    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper bounds',
+    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper continuity bounds',
   );
 });
 

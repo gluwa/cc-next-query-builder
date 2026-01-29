@@ -105,8 +105,14 @@ export class PrecompileBlockProver implements BlockProvingProvider {
       method = this.blockProverContract.getFunction(VERIFY_SINGLE_NO_EVENT);
     }
 
+    // Calculate a reasonable estimate based on continuity proof size (matching Rust logic)
+    // Base: 21000 (tx) + ~5000 per continuity block + ~10000 for merkle + overhead
+    const calculatedGas = 21000 + continuityProof.roots.length * 5000 + 10000 + 10000;
+
     try {
-      return await method.staticCall(chainKey, height, encodedTransaction, merkleProof, continuityProof);
+      return await method.staticCall(chainKey, height, encodedTransaction, merkleProof, continuityProof, {
+        gasLimit: calculatedGas,
+      });
     } catch (error: any) {
       console.error(`Error trying to verify query: ${error.shortMessage}`);
       throw error;
@@ -175,8 +181,14 @@ export class PrecompileBlockProver implements BlockProvingProvider {
       method = this.blockProverContract.getFunction(VERIFY_BATCH_NO_EVENT);
     }
 
+    // Calculate a reasonable estimate based on continuity proof size (matching Rust logic)
+    // Base: 21000 (tx) + ~5000 per continuity block + ~10000 for merkle + overhead
+    const calculatedGas = 21000 + sharedProof.roots.length * 5000 + merkleProofs.length * 10000 + 10000;
+
     try {
-      return await method.staticCall(chainKey, heights, encodedTransaction, merkleProofs, sharedProof);
+      return await method.staticCall(chainKey, heights, encodedTransaction, merkleProofs, sharedProof, {
+        gasLimit: calculatedGas,
+      });
     } catch (error: any) {
       console.error(`Error trying to verify query: ${error.shortMessage}`);
       throw error;

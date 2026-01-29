@@ -44,10 +44,10 @@ export class ContinuityProofBuilder {
    * Creates a ContinuityProof from an array of AttestationBlocks.
    *
    * Blocks are expected to be in order from **lowest to highest block number** and to be contiguous.
-   * Otherwise, the resulting proof will not be usable for proving.
    *
    * @param blocks Array of AttestationBlocks to convert, ordered by block number
    * @returns ContinuityProof object with lowerEndpointDigest and merkle roots
+   * @throws Error if blocks are not ordered or contiguous
    *
    * @example
    * ```typescript
@@ -67,6 +67,20 @@ export class ContinuityProofBuilder {
   public static createFrom(blocks: AttestationBlock[]): ContinuityProof {
     if (blocks.length === 0) {
       return { lowerEndpointDigest: '', roots: [] };
+    }
+
+    // Validate blocks are ordered and contiguous
+    for (let i = 1; i < blocks.length; i++) {
+      const prev = blocks[i - 1];
+      const curr = blocks[i];
+
+      if (curr.blockNumber !== prev.blockNumber + 1) {
+        throw new Error(`Blocks are not contiguous: gap between ${prev.blockNumber} and ${curr.blockNumber}`);
+      }
+
+      if (curr.prevDigest !== prev.digest) {
+        throw new Error(`Block digest chain broken at block ${curr.blockNumber}`);
+      }
     }
 
     // The lowerEndpointDigest is the prev_digest of the first block
@@ -127,7 +141,9 @@ export class ContinuityProofBuilder {
     // Fetch attestation bounds from the attestation provider
     const bounds = await this.chainInfoProvider.getContinuityBounds(this.chainKey, queryHeight);
     if (!bounds.lowerBound || !bounds.upperBound) {
-      throw new Error(`Cannot build continuity proof for height ${queryHeight} without both lower and upper bounds`);
+      throw new Error(
+        `Cannot build continuity proof for height ${queryHeight} without both lower and upper continuity bounds`,
+      );
     }
     console.log(
       `Found attestation bounds for height ${queryHeight}: lower=${bounds.lowerBound.blockNumber}, upper=${bounds.upperBound.blockNumber}`,
@@ -144,23 +160,19 @@ export class ContinuityProofBuilder {
     const lowerBound = bounds.lowerBound!;
     const upperBound = bounds.upperBound!;
 
-    const lastestBlockNumber = await this.blockProvider.getBlockNumber();
+    const latestBlockNumber = await this.blockProvider.getBlockNumber();
 
-    if (lastestBlockNumber < queryHeight) {
-      throw new Error(`Latest block number ${lastestBlockNumber} is less than query height ${queryHeight}`);
+    // If latest block number is less than query height, we cannot build the proof since we should not
+    // have attestations for future blocks
+    if (latestBlockNumber < queryHeight) {
+      throw new Error(`Latest block number ${latestBlockNumber} is less than query height ${queryHeight}`);
     }
 
-    // Validate that upper bound is a reasonable height
-    if (upperBound.blockNumber > lastestBlockNumber + 1000) {
+    // If upper bound is beyond latest block number, we cannot build the proof since we'll not be able
+    // to get continuity blocks up to that height
+    if (upperBound.blockNumber > latestBlockNumber) {
       throw new Error(
-        `Invalid checkpoint block number ${upperBound.blockNumber} greater than latest block number ${lastestBlockNumber}`,
-      );
-    }
-
-    // If upper bound is beyond latest block number, we cannot build the proof
-    if (upperBound.blockNumber > lastestBlockNumber) {
-      throw new Error(
-        `Cannot build continuity proof up to attestation/checkpoint at height ${upperBound.blockNumber} greater than latest block number ${lastestBlockNumber}`,
+        `Cannot build continuity proof up to attestation/checkpoint at height ${upperBound.blockNumber} greater than latest block number ${latestBlockNumber}`,
       );
     }
 
@@ -171,15 +183,27 @@ export class ContinuityProofBuilder {
     const buildStartHeight = lowerBound.blockNumber + 1;
 
     // Query and build continuity blocks
-    const blocks = await this.createContinuityBlocks(buildStartHeight, endHeight, lowerBound.digest);
+    const blocks = await this.buildContinuityBlocks(buildStartHeight, endHeight, lowerBound.digest);
 
     // Trim blocks to start from queryHeight
     const filteredBlocks = blocks.filter((b) => b.blockNumber >= queryHeight);
 
+    if (filteredBlocks.length === 0) {
+      throw new Error(`No continuity blocks found after trimming to query height ${queryHeight}`);
+    }
+
+    // Validate that trimmed blocks end at the upper attestation block
+    const lastBlock = filteredBlocks[filteredBlocks.length - 1];
+    if (lastBlock.blockNumber !== endHeight) {
+      throw new Error(
+        `Trimmed blocks don't end at upper attestation block: expected ${endHeight}, got ${lastBlock.blockNumber}`,
+      );
+    }
+
     return filteredBlocks;
   }
 
-  private async createContinuityBlocks(
+  private async buildContinuityBlocks(
     buildStartHeight: number,
     endHeight: number,
     lowerDigest: string,
@@ -192,19 +216,22 @@ export class ContinuityProofBuilder {
 
     const blockNumbers = Array.from({ length: blockCount }, (_, i) => buildStartHeight + i);
 
-    // First we need to get the block and receipts for the transaction blocks
-    const blocksWithReceipt = await Promise.all(
-      blockNumbers.map(async (bn) => {
-        return await this.blockProvider.getBlockWithReceipts(bn);
-      }) || [],
-    );
+    // Add delay between requests to avoid overwhelming the provider
+    const blocksWithReceipt = [];
+    for (const blockNumber of blockNumbers) {
+      const block = await this.blockProvider.getBlockWithReceipts(blockNumber);
 
-    // Ensure blocks are ordered by block number
-    const orderedBlocksWithReceipt = blocksWithReceipt.sort((a, b) => a.block.number - b.block.number);
+      if (block) {
+        blocksWithReceipt.push(block);
+      }
+
+      // Small delay to prevent rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
 
     let prevDigest = lowerDigest;
     // Now we need to get the continuity proof for the blocks
-    const continuityBlocks = orderedBlocksWithReceipt.map(({ block, transactions, receipts }) => {
+    const continuityBlocks = blocksWithReceipt.map(({ block, transactions, receipts }) => {
       const orderedReceipts = receipts.sort((a, b) => a.index - b.index);
       const orderedTransactions = transactions.sort((a, b) => a!.formatted.index - b!.formatted.index);
       const merkleRoot = computeMerkleRootOfBlock(orderedTransactions, orderedReceipts, this.encoding);

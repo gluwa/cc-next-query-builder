@@ -1,7 +1,7 @@
 import { ProofGenerationResult, ProofGenerator } from '..';
 import { ChainInfoProvider } from '../../chain-info';
 
-import { abiEncode, EncodingVersion } from '../../encoding';
+import { abiEncode, EncodingVersion, TransactionWithRaw } from '../../encoding';
 
 import { ContinuityProofBuilder } from './continuity-proof';
 import { KeccakMerkleTree } from './merkle';
@@ -56,23 +56,29 @@ export class RawProofGenerator implements ProofGenerator {
 
     console.log(`Transaction found in block ${blockNumber}: ${blockHash} at index ${txIndex}`);
 
-    const { block, receipts } = await this.blockProvider.getBlockWithReceipts(blockNumber);
-    if (!block) {
+    const blockWithReceipts = await this.blockProvider.getBlockWithReceipts(blockNumber);
+    if (!blockWithReceipts) {
       return { success: false, error: `Block ${blockNumber} not found for transaction ${transactionHash}` };
     }
-    const orderedReceipts = receipts.sort((a, b) => a.index - b.index);
+    const orderedReceipts = blockWithReceipts.receipts.sort((a, b) => a.index - b.index);
 
     // We need the data of all transactions in the block
     // to build the merkle proof of the block
-    const transactions = await Promise.all(
-      block.transactions.map(async (txHash) => {
-        return await this.blockProvider.getTransaction(txHash);
-      }) || [],
-    );
-    const orderedTransactions = transactions.sort((a, b) => a!.formatted.index - b!.formatted.index);
+    const transactions = [];
+    for (const txHash of blockWithReceipts.block.transactions) {
+      const txData = await this.blockProvider.getTransaction(txHash);
+      if (txData) {
+        transactions.push(txData);
+      } else {
+        return { success: false, error: `Transaction ${txHash} not found in block ${blockNumber}` };
+      }
+
+      // Small delay to prevent rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
 
     // If for some reason the counts don't match, error out
-    if (orderedTransactions.length !== orderedReceipts.length) {
+    if (transactions.length !== orderedReceipts.length) {
       return {
         success: false,
         error: `Mismatch between transactions and receipts count in block ${blockNumber}`,
@@ -81,7 +87,7 @@ export class RawProofGenerator implements ProofGenerator {
 
     // We can now ABI encode all transactions in the block
     // which will be the leaves of the merkle tree
-    const encodedTx = orderedTransactions.map((txData, idx) => {
+    const encodedTx = transactions.map((txData, idx) => {
       // ABI encoded transaction + receipt
       const encoded = abiEncode(txData!, orderedReceipts[idx], EncodingVersion.V1);
 
