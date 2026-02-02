@@ -197,6 +197,14 @@ class MockContinuityProvider implements chainInfo.ChainInfoProvider {
   ): Promise<void> {
     return;
   }
+
+  public async getAttestationHeightForDigest(_chainKey: number, _digest: string): Promise<chainInfo.HeightResult> {
+    throw new Error('Method not implemented.');
+  }
+
+  public async getCheckpointForHeight(_chainKey: number, _height: number): Promise<chainInfo.HeightHash> {
+    throw new Error('Method not implemented.');
+  }
 }
 
 test('RawProofGenerator: should return proof', async () => {
@@ -350,6 +358,12 @@ test.skip('E2E ProofGenerator integration test', async () => {
 
   const latestHeightHash = await chainInfoProvider.getLatestAttestedHeightAndHash(2);
   console.log('Latest attested height and hash for chain key 2:', latestHeightHash);
+
+  const attestationHeightResult = await chainInfoProvider.getAttestationHeightForDigest(2, latestHeightHash.hash);
+  console.log('Attestation height result for latest attested hash:', attestationHeightResult);
+
+  const checkpointDigest = await chainInfoProvider.getCheckpointForHeight(2, 0);
+  console.log('Checkpoint digest for latest attested height:', checkpointDigest);
 
   const genesisHeightHash = await chainInfoProvider.getAttestationGenesisHeight(2);
   console.log('Genesis attestation height for chain key 2:', genesisHeightHash);

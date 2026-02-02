@@ -40,6 +40,18 @@ export interface ChainInfo {
 }
 
 /**
+ * Information about a specific query height.
+ *
+ * @member height - The height result
+ * @member exists - Whether the height exists on the chain
+ *
+ */
+export interface HeightResult {
+  height: number;
+  exists: boolean;
+}
+
+/**
  * Information about the latest attested block height and hash for a specific chain.
  *
  * If `exists` is false, it indicates that there are no attestations for the specified chain,
@@ -67,6 +79,8 @@ export interface ChainInfoProvider {
     pollIntervalMs?: number,
     waitTimeoutMs?: number,
   ): Promise<void>;
+  getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult>;
+  getCheckpointForHeight(chainKey: number, height: number): Promise<HeightHash>;
 }
 
 /**
@@ -168,7 +182,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * Retrieves information about a specific supported source chain by its chain key
    * if the chain is not supported, returns null.
    *
-   * @param chainKey The unique identifier for the source chain on the creditcoin network
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @returns Promise resolving to a ChainInfo object or null if the chain is not supported
    *
    * @throws Error if the contract call fails or returns invalid data
@@ -432,6 +446,110 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
       }
 
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+  }
+
+  /**
+   * Retrieves the attestation height for a specific block digest on a chain
+   *
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @param digest - The block digest to query attestation height for
+   * @returns A Promise that resolves to a HeightResult object containing the attestation height and existence flag
+   * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   * const digest = '0xabc123...'; // Example block digest
+   *
+   * const heightResult = await chainInfoProvider.getAttestationHeightForDigest(chainKey, digest);
+   * // Results in:
+   * // {
+   * //   height: 150,
+   * //   exists: true
+   * // }
+   * ```
+   */
+  public async getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult> {
+    try {
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const heightResult = await this.chainInfoContract.get_attestation_height_for_digest(chainKey, digest, {
+        gasLimit,
+      });
+
+      // Validate bounds structure before casting
+      if (!heightResult || typeof heightResult !== 'object') {
+        throw new Error('Invalid data returned from contract: expected object');
+      }
+
+      if (heightResult.length !== 2) {
+        throw new Error(`Invalid data returned from contract: expected 2 fields, got ${heightResult.length}`);
+      }
+
+      const heightResultObj: HeightResult = {
+        height: Number(heightResult[0]),
+        exists: heightResult[1],
+      };
+
+      return heightResultObj;
+    } catch (error: any) {
+      throw new Error(`Error calling contract method: ${error}`);
+    }
+  }
+
+  /**
+   * Retrieves the checkpoint information for a specific block height on a chain
+   *
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @param height - The block height to query checkpoint for
+   * @returns A Promise that resolves to a HeightHash object containing the checkpoint height, hash, and existence flag
+   * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   * const height = 100; // Example block height
+   *
+   * const checkpoint = await chainInfoProvider.getCheckpointForHeight(chainKey, height);
+   * // Results in:
+   * // {
+   * //   height: 100,
+   * //   hash: '0xabc123...',
+   * //   exists: true
+   * // }
+   * ```
+   */
+  public async getCheckpointForHeight(chainKey: number, height: number): Promise<HeightHash> {
+    try {
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const heightHash = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height, { gasLimit });
+
+      // Validate bounds structure before casting
+      if (!heightHash || typeof heightHash !== 'object') {
+        throw new Error('Invalid data returned from contract: expected object');
+      }
+
+      if (heightHash.length !== 3) {
+        throw new Error(`Invalid data returned from contract: expected 3 fields, got ${heightHash.length}`);
+      }
+
+      const heightHashObj: HeightHash = {
+        height: Number(heightHash[0]),
+        hash: heightHash[1],
+        exists: heightHash[2],
+      };
+
+      return heightHashObj;
+    } catch (error: any) {
+      throw new Error(`Error calling contract method: ${error}`);
     }
   }
 }
