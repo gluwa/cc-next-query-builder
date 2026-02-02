@@ -12,7 +12,6 @@ export interface BlockProvingProvider {
     encodedTransaction: string,
     merkleProof: TransactionMerkleProof,
     continuityProof: ContinuityProof,
-    emitEvent: boolean,
   ): Promise<boolean>;
   verifyBatch(
     chainKey: number,
@@ -20,7 +19,6 @@ export interface BlockProvingProvider {
     encodedTransaction: string[],
     merkleProofs: TransactionMerkleProof[],
     sharedProof: ContinuityProof,
-    emitEvent: boolean,
   ): Promise<boolean>;
 }
 
@@ -29,12 +27,8 @@ export interface BlockProvingProvider {
  */
 export const BLOCK_PROVER_PRECOMPILE_ADDRESS = '0x0000000000000000000000000000000000000FD2';
 
-const VERIFY_SINGLE_NO_EVENT = 'verify(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
-const VERIFY_SINGLE_WITH_EVENT = 'verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
-
-const VERIFY_BATCH_NO_EVENT = 'verify(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
-const VERIFY_BATCH_WITH_EVENT =
-  'verifyAndEmit(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
+const VERIFY_SINGLE = 'verify(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
+const VERIFY_BATCH = 'verify(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
 
 /**
  * Implementation of BlockProvingProvider using a link the precompile contract on creditcoin.
@@ -65,7 +59,6 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @param encodedTransaction - The ABI-encoded transaction data using the `abiEncode` function or equivalent.
    * @param merkleProof - The Merkle proof for the transaction inclusion
    * @param continuityProof - The continuity proof for the block
-   * @param emitEvent - Whether to emit an event upon successful verification
    * @returns A promise resolving to true if verification succeeds, false otherwise
    * @throws Error if the verification call fails
    *
@@ -85,7 +78,6 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    *   proofData.txBytes,
    *   proofData.merkleProof,
    *   proofData.continuityProof,
-   *   true,
    * );
    * expect(provingResult).toBe(true);
    * ```
@@ -96,23 +88,11 @@ export class PrecompileBlockProver implements BlockProvingProvider {
     encodedTransaction: string,
     merkleProof: TransactionMerkleProof,
     continuityProof: ContinuityProof,
-    emitEvent: boolean,
   ): Promise<boolean> {
-    let method: ContractMethod;
-    if (emitEvent) {
-      method = this.blockProverContract.getFunction(VERIFY_SINGLE_WITH_EVENT);
-    } else {
-      method = this.blockProverContract.getFunction(VERIFY_SINGLE_NO_EVENT);
-    }
-
-    // Calculate a reasonable estimate based on continuity proof size (matching Rust logic)
-    // Base: 21000 (tx) + ~5000 per continuity block + ~10000 for merkle + overhead
-    const calculatedGas = 21000 + continuityProof.roots.length * 5000 + 10000 + 10000;
+    const method: ContractMethod = this.blockProverContract.getFunction(VERIFY_SINGLE);
 
     try {
-      return await method.staticCall(chainKey, height, encodedTransaction, merkleProof, continuityProof, {
-        gasLimit: calculatedGas,
-      });
+      return await method.staticCall(chainKey, height, encodedTransaction, merkleProof, continuityProof);
     } catch (error: any) {
       console.error(`Error trying to verify query: ${error.shortMessage}`);
       throw error;
@@ -127,7 +107,6 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @param encodedTransaction - An array of ABI-encoded transaction data using the `abiEncode` function or equivalent.
    * @param merkleProofs - An array of Merkle proofs for each transaction inclusion
    * @param sharedProof - A shared continuity proof for the batch of blocks
-   * @param emitEvent - Whether to emit an event upon successful verification
    * @returns A promise resolving to true if all verifications succeed, false otherwise
    * @throws Error if the verification call fails
    * @example
@@ -160,7 +139,6 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    *   encodedTransactions,
    *   merkleProofs,
    *   mergedProof,
-   *   true,
    * );
    * expect(provingResult).toBe(true);
    * ```
@@ -172,23 +150,11 @@ export class PrecompileBlockProver implements BlockProvingProvider {
     encodedTransaction: string[],
     merkleProofs: TransactionMerkleProof[],
     sharedProof: ContinuityProof,
-    emitEvent: boolean,
   ): Promise<boolean> {
-    let method: ContractMethod;
-    if (emitEvent) {
-      method = this.blockProverContract.getFunction(VERIFY_BATCH_WITH_EVENT);
-    } else {
-      method = this.blockProverContract.getFunction(VERIFY_BATCH_NO_EVENT);
-    }
-
-    // Calculate a reasonable estimate based on continuity proof size (matching Rust logic)
-    // Base: 21000 (tx) + ~5000 per continuity block + ~10000 for merkle + overhead
-    const calculatedGas = 21000 + sharedProof.roots.length * 5000 + merkleProofs.length * 10000 + 10000;
+    const method: ContractMethod = this.blockProverContract.getFunction(VERIFY_BATCH);
 
     try {
-      return await method.staticCall(chainKey, heights, encodedTransaction, merkleProofs, sharedProof, {
-        gasLimit: calculatedGas,
-      });
+      return await method.staticCall(chainKey, heights, encodedTransaction, merkleProofs, sharedProof);
     } catch (error: any) {
       console.error(`Error trying to verify query: ${error.shortMessage}`);
       throw error;

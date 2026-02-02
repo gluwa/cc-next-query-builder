@@ -138,10 +138,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getSupportedChains(): Promise<ChainInfo[]> {
     try {
-      // Measured on testnet (~24000), added some buffer
-      const gasLimit = 38_000;
-
-      const chains = await this.chainInfoContract.get_supported_chains({ gasLimit });
+      const chains = await this.chainInfoContract.get_supported_chains();
 
       // Validate contract output structure before casting
       if (!chains || typeof chains !== 'object') {
@@ -197,10 +194,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getSupportedChainByKey(chainKey: number): Promise<ChainInfo | null> {
     try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const chainResult = await this.chainInfoContract.get_chain_by_key(chainKey, { gasLimit });
+      const chainResult = await this.chainInfoContract.get_chain_by_key(chainKey);
 
       // Validate contract output structure before casting
       if (!chainResult || typeof chainResult !== 'object') {
@@ -261,10 +255,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
     try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(chainKey, { gasLimit });
+      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(chainKey);
 
       // Validate output structure before returning
       if (typeof genesisHeight !== 'bigint') {
@@ -300,10 +291,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
     try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey, { gasLimit });
+      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey);
 
       // Validate bounds structure before casting
       if (!heightHash || typeof heightHash !== 'object') {
@@ -350,10 +338,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds> {
     try {
-      // Measured on testnet (~37000), added some buffer
-      const gasLimit = 70_000;
-
-      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height, { gasLimit });
+      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height);
 
       // Validate bounds structure before casting
       if (!bounds || typeof bounds !== 'object') {
@@ -474,12 +459,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult> {
     try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const heightResult = await this.chainInfoContract.get_attestation_height_for_digest(chainKey, digest, {
-        gasLimit,
-      });
+      const heightResult = await this.chainInfoContract.get_attestation_height_for_digest(chainKey, digest);
 
       // Validate bounds structure before casting
       if (!heightResult || typeof heightResult !== 'object') {
@@ -527,10 +507,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getCheckpointForHeight(chainKey: number, height: number): Promise<HeightHash> {
     try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const heightHash = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height, { gasLimit });
+      const heightHash = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height);
 
       // Validate bounds structure before casting
       if (!heightHash || typeof heightHash !== 'object') {

@@ -339,7 +339,7 @@ test('RawProofGenerator: return error if upper bound is above current block heig
   );
 });
 
-test.skip('E2E ProofGenerator integration test', async () => {
+test('E2E ProofGenerator integration test', async () => {
   // Initialize block provider connected to local source ethereum chain
   const sourceChainRpc = 'http://localhost:8545';
   const ethProvider = new JsonRpcProvider(sourceChainRpc);
@@ -404,7 +404,6 @@ test.skip('E2E ProofGenerator integration test', async () => {
     proofData.txBytes,
     proofData.merkleProof,
     proofData.continuityProof,
-    true,
   );
   expect(proveResultRaw).toBe(true);
 
@@ -428,7 +427,6 @@ test.skip('E2E ProofGenerator integration test', async () => {
     apiProofData_1.txBytes,
     apiProofData_1.merkleProof,
     apiProofData_1.continuityProof,
-    true,
   );
   expect(proveResultApi_1).toBe(true);
 
@@ -451,7 +449,6 @@ test.skip('E2E ProofGenerator integration test', async () => {
     [apiProofData_1.txBytes, apiProofData_2.txBytes],
     [apiProofData_1.merkleProof, apiProofData_2.merkleProof],
     mergedProof,
-    true,
   );
   expect(proveResultApi_2).toBe(true);
 }, 120_000);
