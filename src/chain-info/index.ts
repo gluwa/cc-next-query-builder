@@ -56,10 +56,11 @@ export interface HeightHash {
 }
 
 export interface ChainInfoProvider {
-  getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds>;
   getSupportedChains(): Promise<ChainInfo[]>;
+  getSupportedChainByKey(chainKey: number): Promise<ChainInfo | null>;
   getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash>;
   getAttestationGenesisHeight(chainKey: number): Promise<number>;
+  getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds>;
   waitUntilHeightAttested(
     chainKey: number,
     targetHeight: number,
@@ -101,6 +102,214 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   constructor(rpc: JsonRpcApiProvider, chainInfoPrecompile: string = CHAIN_INFO_PRECOMPILE_ADDRESS) {
     this.chainInfoContract = new Contract(chainInfoPrecompile, contractABI, rpc);
+  }
+
+  /**
+   * Retrieves information about all supported source chains on the creditcoin network
+   * @returns Promise resolving to an array of ChainInfo objects containing chain details
+   * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const supportedChains = await chainInfoProvider.getSupportedChains();
+   * // Results in:
+   * // [
+   * //   { chainKey: 1, chainId: 1, chainName: 'Ethereum Mainnet', chainEncoding: 1 },
+   * //   { chainKey: 2, chainId: 56, chainName: 'Binance Smart Chain', chainEncoding: 1 },
+   * //   ...
+   * // ]
+   * ```
+   */
+  public async getSupportedChains(): Promise<ChainInfo[]> {
+    try {
+      // Measured on testnet (~24000), added some buffer
+      const gasLimit = 38_000;
+
+      const chains = await this.chainInfoContract.get_supported_chains({ gasLimit });
+
+      // Validate contract output structure before casting
+      if (!chains || typeof chains !== 'object') {
+        throw new Error('Invalid bounds returned from contract: expected object');
+      }
+
+      if (chains.length === 0) {
+        return [];
+      }
+
+      const chainInfo: ChainInfo[] = chains.map((chainEntry: any) => {
+        // Validate entry structure try to extract fields
+        if (!chainEntry || typeof chainEntry !== 'object') {
+          throw new Error('Invalid chain info entry: expected object');
+        }
+
+        if (chainEntry.length !== 4) {
+          throw new Error(
+            `Invalid chain info entry returned from contract: expected 4 fields, got ${chainEntry.length}`,
+          );
+        }
+
+        return {
+          chainKey: Number(chainEntry[0]),
+          chainId: Number(chainEntry[1]),
+          chainName: chainEntry[2], // TODO: Name decoding seems to be failing, investigate (you get all zeros currently)
+          chainEncoding: Number(chainEntry[3]),
+        };
+      });
+
+      return chainInfo;
+    } catch (error: any) {
+      throw new Error(`Error calling contract method: ${error}`);
+    }
+  }
+
+  /**
+   * Retrieves information about a specific supported source chain by its chain key
+   * if the chain is not supported, returns null.
+   *
+   * @param chainKey The unique identifier for the source chain on the creditcoin network
+   * @returns Promise resolving to a ChainInfo object or null if the chain is not supported
+   *
+   * @throws Error if the contract call fails or returns invalid data
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   * const chainKey = 2; // Example chain key
+   * const chainInfo = await chainInfoProvider.getSupportedChainByKey(chainKey);
+   * // Results in:
+   * // { chainKey: 2, chainId: 31338, chainName: '0x416e76696c32', chainEncoding: 1 }
+   * ```
+   */
+  public async getSupportedChainByKey(chainKey: number): Promise<ChainInfo | null> {
+    try {
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const chainResult = await this.chainInfoContract.get_chain_by_key(chainKey, { gasLimit });
+
+      // Validate contract output structure before casting
+      if (!chainResult || typeof chainResult !== 'object') {
+        throw new Error('Invalid bounds returned from contract: expected object');
+      }
+
+      if (chainResult.length !== 2) {
+        return null;
+      }
+
+      const rawChainInfo = chainResult[0];
+      const exists = chainResult[1];
+
+      if (!exists) {
+        return null;
+      }
+
+      if (!rawChainInfo || typeof rawChainInfo !== 'object') {
+        throw new Error('Invalid chain info entry: expected object');
+      }
+
+      if (rawChainInfo.length !== 4) {
+        throw new Error(
+          `Invalid chain info entry returned from contract: expected 4 fields, got ${rawChainInfo.length}`,
+        );
+      }
+
+      return {
+        chainKey: Number(rawChainInfo[0]),
+        chainId: Number(rawChainInfo[1]),
+        chainName: rawChainInfo[2],
+        chainEncoding: Number(rawChainInfo[3]),
+      };
+    } catch (error: any) {
+      throw new Error(`Error calling contract method: ${error}`);
+    }
+  }
+
+  /**
+   * Retrieves the genesis height for attestations on a specific chain. **If the chain is not supported or
+   * it has no configured genesis height, the method will return 0.**
+   *
+   * To check if a chain is supported, use the `getSupportedChains` method.
+   *
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @returns Promise resolving to the genesis height as a bigint
+   * @throws Error if the contract call fails or returns invalid data
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   *
+   * const genesisHeight = await chainInfoProvider.getAttestationGenesisHeight(chainKey);
+   * // Results in:
+   * // 100
+   * ```
+   */
+  public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
+    try {
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(chainKey, { gasLimit });
+
+      // Validate output structure before returning
+      if (typeof genesisHeight !== 'bigint') {
+        throw new Error('Invalid data returned from contract: expected genesis height');
+      }
+
+      return Number(genesisHeight);
+    } catch (error: any) {
+      throw new Error(`Error calling contract method: ${error}`);
+    }
+  }
+
+  /**
+   * Gets the latest attested block height and hash for a specific chain
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @returns Promise resolving to HeightHash object containing height, hash, and existence status
+   * @throws Error if the contract call fails or returns invalid data
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
+   *
+   * const chainKey = 2; // Example chain key
+   *
+   * const latestAttestation = await chainInfoProvider.getLatestAttestedHeightAndHash(chainKey);
+   * // Results in:
+   * // {
+   * //   height: 150,
+   * //   hash: '0xabc123...',
+   * //   exists: true
+   * // }
+   * ```
+   */
+  public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
+    try {
+      // Measured on testnet (~22000), added some buffer
+      const gasLimit = 35_000;
+
+      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey, { gasLimit });
+
+      // Validate bounds structure before casting
+      if (!heightHash || typeof heightHash !== 'object') {
+        throw new Error('Invalid data returned from contract: expected object');
+      }
+
+      if (heightHash.length !== 3) {
+        throw new Error(`Invalid data returned from contract: expected 3 fields, got ${heightHash.length}`);
+      }
+
+      const heightHashObj: HeightHash = {
+        height: Number(heightHash[0]),
+        hash: heightHash[1],
+        exists: heightHash[2],
+      };
+
+      return heightHashObj;
+    } catch (error: any) {
+      throw new Error(`Error calling contract method: ${error}`);
+    }
   }
 
   /**
@@ -174,153 +383,6 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
         lowerBound: lowerBounds,
         upperBound: upperBounds,
       };
-    } catch (error: any) {
-      throw new Error(`Error calling contract method: ${error}`);
-    }
-  }
-
-  /**
-   * Retrieves information about all supported source chains on the creditcoin network
-   * @returns Promise resolving to an array of ChainInfo objects containing chain details
-   * @throws Error if the contract call fails or returns invalid data
-   *
-   * @example
-   * ```typescript
-   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
-   *
-   * const supportedChains = await chainInfoProvider.getSupportedChains();
-   * // Results in:
-   * // [
-   * //   { chainKey: 1, chainId: 1, chainName: 'Ethereum Mainnet', chainEncoding: 1 },
-   * //   { chainKey: 2, chainId: 56, chainName: 'Binance Smart Chain', chainEncoding: 1 },
-   * //   ...
-   * // ]
-   * ```
-   */
-  public async getSupportedChains(): Promise<ChainInfo[]> {
-    try {
-      // Measured on testnet (~24000), added some buffer
-      const gasLimit = 38_000;
-
-      const chains = await this.chainInfoContract.get_supported_chains({ gasLimit });
-
-      // Validate contract output structure before casting
-      if (!chains || typeof chains !== 'object') {
-        throw new Error('Invalid bounds returned from contract: expected object');
-      }
-
-      if (chains.length === 0) {
-        return [];
-      }
-
-      const chainInfo: ChainInfo[] = chains.map((chainEntry: any) => {
-        // Validate entry structure try to extract fields
-        if (!chainEntry || typeof chainEntry !== 'object') {
-          throw new Error('Invalid chain info entry: expected object');
-        }
-
-        if (chainEntry.length !== 4) {
-          throw new Error(
-            `Invalid chain info entry returned from contract: expected 4 fields, got ${chainEntry.length}`,
-          );
-        }
-
-        return {
-          chainKey: Number(chainEntry[0]),
-          chainId: Number(chainEntry[1]),
-          chainName: chainEntry[2], // TODO: Name decoding seems to be failing, investigate (you get all zeros currently)
-          chainEncoding: Number(chainEntry[3]),
-        };
-      });
-
-      return chainInfo;
-    } catch (error: any) {
-      throw new Error(`Error calling contract method: ${error}`);
-    }
-  }
-
-  /**
-   * Gets the latest attested block height and hash for a specific chain
-   * @param chainKey - The unique identifier for the source chain on the creditcoin network
-   * @returns Promise resolving to HeightHash object containing height, hash, and existence status
-   * @throws Error if the contract call fails or returns invalid data
-   *
-   * @example
-   * ```typescript
-   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
-   *
-   * const chainKey = 2; // Example chain key
-   *
-   * const latestAttestation = await chainInfoProvider.getLatestAttestedHeightAndHash(chainKey);
-   * // Results in:
-   * // {
-   * //   height: 150,
-   * //   hash: '0xabc123...',
-   * //   exists: true
-   * // }
-   * ```
-   */
-  public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
-    try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey, { gasLimit });
-
-      // Validate bounds structure before casting
-      if (!heightHash || typeof heightHash !== 'object') {
-        throw new Error('Invalid data returned from contract: expected object');
-      }
-
-      if (heightHash.length !== 3) {
-        throw new Error(`Invalid data returned from contract: expected 3 fields, got ${heightHash.length}`);
-      }
-
-      const heightHashObj: HeightHash = {
-        height: Number(heightHash[0]),
-        hash: heightHash[1],
-        exists: heightHash[2],
-      };
-
-      return heightHashObj;
-    } catch (error: any) {
-      throw new Error(`Error calling contract method: ${error}`);
-    }
-  }
-
-  /**
-   * Retrieves the genesis height for attestations on a specific chain. **If the chain is not supported or
-   * it has no configured genesis height, the method will return 0.**
-   *
-   * To check if a chain is supported, use the `getSupportedChains` method.
-   *
-   * @param chainKey - The unique identifier for the source chain on the creditcoin network
-   * @returns Promise resolving to the genesis height as a bigint
-   * @throws Error if the contract call fails or returns invalid data
-   * @example
-   * ```typescript
-   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider);
-   *
-   * const chainKey = 2; // Example chain key
-   *
-   * const genesisHeight = await chainInfoProvider.getAttestationGenesisHeight(chainKey);
-   * // Results in:
-   * // 100
-   * ```
-   */
-  public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
-    try {
-      // Measured on testnet (~22000), added some buffer
-      const gasLimit = 35_000;
-
-      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(gasLimit);
-
-      // Validate output structure before returning
-      if (typeof genesisHeight !== 'bigint') {
-        throw new Error('Invalid data returned from contract: expected genesis height');
-      }
-
-      return Number(genesisHeight);
     } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }

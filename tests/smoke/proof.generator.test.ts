@@ -177,6 +177,11 @@ class MockContinuityProvider implements chainInfo.ChainInfoProvider {
   public async getSupportedChains(): Promise<chainInfo.ChainInfo[]> {
     throw new Error('Method not implemented.');
   }
+
+  public async getSupportedChainByKey(chainKey: number): Promise<chainInfo.ChainInfo | null> {
+    throw new Error('Method not implemented.');
+  }
+
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<chainInfo.HeightHash> {
     throw new Error('Method not implemented.');
   }
@@ -339,6 +344,9 @@ test.skip('E2E ProofGenerator integration test', async () => {
 
   const chainInfos = await chainInfoProvider.getSupportedChains();
   console.log('Supported chains from continuity provider:', chainInfos);
+
+  const chainResult = await chainInfoProvider.getSupportedChainByKey(2);
+  console.log('Chain info for chain key 2:', chainResult);
 
   const latestHeightHash = await chainInfoProvider.getLatestAttestedHeightAndHash(2);
   console.log('Latest attested height and hash for chain key 2:', latestHeightHash);
