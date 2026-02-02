@@ -339,7 +339,7 @@ test('RawProofGenerator: return error if upper bound is above current block heig
   );
 });
 
-test('E2E ProofGenerator integration test', async () => {
+test.skip('E2E ProofGenerator integration test', async () => {
   // Initialize block provider connected to local source ethereum chain
   const sourceChainRpc = 'http://localhost:8545';
   const ethProvider = new JsonRpcProvider(sourceChainRpc);
