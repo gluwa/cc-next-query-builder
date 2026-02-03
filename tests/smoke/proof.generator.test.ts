@@ -374,8 +374,8 @@ test.skip('E2E ProofGenerator integration test', async () => {
   // Initialize BlockProver contract instance from local creditcoin chain
   const prover = new blockProver.PrecompileBlockProver(ccProvider);
 
-  // NOTE: Replace with a valid transaction hash from your local source chain
-  const txHash1 = '0x2d83504d496cb9e4a7f801c7a516aa9b6144b73e39e52f8c2934ae20e1e83c74';
+  // NOTE: Replace with valid transaction hashes from your local source chain
+  const txHash1 = '0x1fd15cc75e4ef16c7e4cec1d2b73e80a599aaa174e44e220fa14143da8ad76be';
   const txBlock1 = await ethProvider.getTransaction(txHash1).then((tx) => tx?.blockNumber);
   const txHash2 = '0x6fe777442b70a5511f3c443176ae860e50445bd93b663711717996a70c5022ab';
   const txBlock2 = await ethProvider.getTransaction(txHash2).then((tx) => tx?.blockNumber);
@@ -384,8 +384,9 @@ test.skip('E2E ProofGenerator integration test', async () => {
   console.log(`Transaction 2 is in block ${txBlock2}`);
 
   // We await the highest block to be attested before generating proofs
-  console.log(`Waiting for block ${latestHeightHash.height} to be attestated...`);
-  await chainInfoProvider.waitUntilHeightAttested(chainKey, Math.max(txBlock1!, txBlock2!));
+  const blockToWait = Math.max(txBlock1!, txBlock2!);
+  console.log(`Waiting for block ${blockToWait} to be attestated...`);
+  await chainInfoProvider.waitUntilHeightAttested(chainKey, blockToWait);
 
   // First we test with the raw proof generator
   const rawProofGenerator = new proofGenerator.raw.RawProofGenerator(
