@@ -140,13 +140,13 @@ export class ContinuityProofBuilder {
 
     // Fetch attestation bounds from the attestation provider
     const bounds = await this.chainInfoProvider.getContinuityBounds(this.chainKey, queryHeight);
-    if (!bounds.lowerBound || !bounds.upperBound) {
+    if (!bounds.isAttested) {
       throw new Error(
         `Cannot build continuity proof for height ${queryHeight} without both lower and upper continuity bounds`,
       );
     }
     console.log(
-      `Found attestation bounds for height ${queryHeight}: lower=${bounds.lowerBound.blockNumber}, upper=${bounds.upperBound.blockNumber}`,
+      `Found attestation bounds for height ${queryHeight}: lower=${bounds.parentHeight}, upper=${bounds.childHeight}`,
     );
 
     // Using those bounds build the continuity blocks
@@ -157,9 +157,6 @@ export class ContinuityProofBuilder {
   }
 
   private async buildAndTrimContinuityFor(queryHeight: number, bounds: ContinuityBounds): Promise<AttestationBlock[]> {
-    const lowerBound = bounds.lowerBound!;
-    const upperBound = bounds.upperBound!;
-
     const latestBlockNumber = await this.blockProvider.getBlockNumber();
 
     // If latest block number is less than query height, we cannot build the proof since we should not
@@ -170,20 +167,20 @@ export class ContinuityProofBuilder {
 
     // If upper bound is beyond latest block number, we cannot build the proof since we'll not be able
     // to get continuity blocks up to that height
-    if (upperBound.blockNumber > latestBlockNumber) {
+    if (bounds.childHeight > latestBlockNumber) {
       throw new Error(
-        `Cannot build continuity proof up to attestation/checkpoint at height ${upperBound.blockNumber} greater than latest block number ${latestBlockNumber}`,
+        `Cannot build continuity proof up to attestation/checkpoint at height ${bounds.childHeight} greater than latest block number ${latestBlockNumber}`,
       );
     }
 
     // Use upper bound as end height
-    const endHeight = upperBound.blockNumber;
+    const endHeight = bounds.childHeight;
 
     // Build from attestation/checkpoint lower bound + 1 up to endHeight
-    const buildStartHeight = lowerBound.blockNumber + 1;
+    const buildStartHeight = bounds.parentHeight + 1;
 
     // Query and build continuity blocks
-    const blocks = await this.buildContinuityBlocks(buildStartHeight, endHeight, lowerBound.digest);
+    const blocks = await this.buildContinuityBlocks(buildStartHeight, endHeight, bounds.parentHash);
 
     // Trim blocks to start from queryHeight
     const filteredBlocks = blocks.filter((b) => b.blockNumber >= queryHeight);

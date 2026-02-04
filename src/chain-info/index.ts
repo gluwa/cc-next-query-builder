@@ -5,23 +5,23 @@ import ChainInfoABI from './chain_info_abi.json';
 const contractABI = ChainInfoABI as unknown as InterfaceAbi;
 
 /**
- * Definition of a continuity bound for a specific block.
- * @member blockNumber - The block number of the bound
- * @member digest - The block digest of the bound
- */
-export interface ContinuityBound {
-  blockNumber: number;
-  digest: string;
-}
-
-/**
- * Continuity bounds structure for a specific block height.
- * @member lowerBound - The lower continuity bound (**can be null if not attested**)
- * @member upperBound - The upper continuity bound (**can be null if not attested**)
+ * Continuity bounds structure
+ * @member parentHeight - The block number of the lower bound
+ * @member parentHash - The block digest of the lower bound
+ * @member parentIsAttestation - true if the lower bound is an attestation, false if it's a checkpoint
+ * @member childHeight - The block number of the upper bound
+ * @member childHash - The block digest of the upper bound
+ * @member childIsAttestation - true if the upper bound is an attestation, false if it's a checkpoint
+ * @member isAttested - true if the requested height is attested, false otherwise
  */
 export interface ContinuityBounds {
-  lowerBound: ContinuityBound | null;
-  upperBound: ContinuityBound | null;
+  parentHeight: number;
+  parentHash: string;
+  parentIsAttestation: boolean;
+  childHeight: number;
+  childHash: string;
+  childIsAttestation: boolean;
+  isAttested: boolean;
 }
 
 /**
@@ -52,18 +52,32 @@ export interface HeightResult {
 }
 
 /**
+ * Information about a specific query hash.
+ *
+ * @member hash - The hash result
+ * @member exists - Whether the hash exists on the chain
+ *
+ */
+export interface HashResult {
+  hash: string;
+  exists: boolean;
+}
+
+/**
  * Information about the latest attested block height and hash for a specific chain.
  *
  * If `exists` is false, it indicates that there are no attestations for the specified chain,
- * and the values of `height` and `hash` should not be considered usable.
+ * and the values of `height`, `hash` and `isAttestation` should not be considered usable.
  *
  * @member height - Block number of the latest attested block
  * @member hash - Block digest of the latest attested block
+ * @member isAttestation - true if the digest corresponds to an attestation, false if it's a checkpoint
  * @member exists - Whether any attestation exists for the chain
  */
 export interface HeightHash {
   height: number;
   hash: string;
+  isAttestation: boolean;
   exists: boolean;
 }
 
@@ -80,23 +94,13 @@ export interface ChainInfoProvider {
     waitTimeoutMs?: number,
   ): Promise<void>;
   getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult>;
-  getCheckpointForHeight(chainKey: number, height: number): Promise<HeightHash>;
+  getCheckpointForHeight(chainKey: number, height: number): Promise<HashResult>;
 }
 
 /**
  * Default address for the ChainInfo precompile contract
  */
 export const CHAIN_INFO_PRECOMPILE_ADDRESS = '0x0000000000000000000000000000000000000fd3';
-
-interface AttestationBounds {
-  parentHeight: number;
-  parentHash: string;
-  parentIsAttestation: boolean;
-  childHeight: number;
-  childHash: string;
-  childIsAttestation: boolean;
-  isAttested: boolean;
-}
 
 /**
  * Implementation of ChainInfoProvider using the ChainInfo precompile contract deployed on Creditcoin.
@@ -298,14 +302,15 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
         throw new Error('Invalid data returned from contract: expected object');
       }
 
-      if (heightHash.length !== 3) {
-        throw new Error(`Invalid data returned from contract: expected 3 fields, got ${heightHash.length}`);
+      if (heightHash.length !== 4) {
+        throw new Error(`Invalid data returned from contract: expected 4 fields, got ${heightHash.length}`);
       }
 
       const heightHashObj: HeightHash = {
         height: Number(heightHash[0]),
         hash: heightHash[1],
-        exists: heightHash[2],
+        isAttestation: heightHash[2],
+        exists: heightHash[3],
       };
 
       return heightHashObj;
@@ -318,7 +323,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * Retrieves the continuity bounds for a specific chain and block height
    * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @param height - The block height to query
-   * @returns Promise resolving to ContinuityBounds containing lower and upper bounds, or null bounds if not attested
+   * @returns Promise resolving to ContinuityBounds object containing the bounds details
    * @throws Error if the contract call fails or returns invalid data
    *
    * @example
@@ -331,8 +336,13 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * const continuityBounds = await chainInfoProvider.getContinuityBounds(chainKey, height);
    * // Results in:
    * // {
-   * //   lowerBound: { blockNumber: 95, digest: '0xabc...' } | null,
-   * //   upperBound: { blockNumber: 105, digest: '0xdef...' } | null
+   * //   parentHeight: 95,
+   * //   parentHash: '0xabc123...',
+   * //   parentIsAttestation: true,
+   * //   childHeight: 105,
+   * //   childHash: '0xdef456...',
+   * //   childIsAttestation: false,
+   * //   isAttested: true
    * // }
    * ```
    */
@@ -349,39 +359,17 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
         throw new Error(`Invalid data returned from contract: expected 7 fields, got ${bounds.length}`);
       }
 
-      const attestationBounds: AttestationBounds = {
-        parentHeight: bounds[0],
+      const continuityBounds: ContinuityBounds = {
+        parentHeight: Number(bounds[0]),
         parentHash: bounds[1],
         parentIsAttestation: bounds[2],
-        childHeight: bounds[3],
+        childHeight: Number(bounds[3]),
         childHash: bounds[4],
         childIsAttestation: bounds[5],
         isAttested: bounds[6],
       };
 
-      // If the request height is not attested, return null bounds
-      if (!attestationBounds.isAttested) {
-        return { lowerBound: null, upperBound: null };
-      }
-
-      const lowerBounds = attestationBounds.parentIsAttestation
-        ? {
-            blockNumber: Number(attestationBounds.parentHeight),
-            digest: attestationBounds.parentHash,
-          }
-        : null;
-
-      const upperBounds = attestationBounds.childIsAttestation
-        ? {
-            blockNumber: Number(attestationBounds.childHeight),
-            digest: attestationBounds.childHash,
-          }
-        : null;
-
-      return {
-        lowerBound: lowerBounds,
-        upperBound: upperBounds,
-      };
+      return continuityBounds;
     } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }
@@ -486,7 +474,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    *
    * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @param height - The block height to query checkpoint for
-   * @returns A Promise that resolves to a HeightHash object containing the checkpoint height, hash, and existence flag
+   * @returns A Promise that resolves to a HashResult object containing the checkpoint hash and existence flag
    * @throws Error if the contract call fails or returns invalid data
    *
    * @example
@@ -499,32 +487,30 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * const checkpoint = await chainInfoProvider.getCheckpointForHeight(chainKey, height);
    * // Results in:
    * // {
-   * //   height: 100,
    * //   hash: '0xabc123...',
    * //   exists: true
    * // }
    * ```
    */
-  public async getCheckpointForHeight(chainKey: number, height: number): Promise<HeightHash> {
+  public async getCheckpointForHeight(chainKey: number, height: number): Promise<HashResult> {
     try {
-      const heightHash = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height);
+      const hashResult = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height);
 
       // Validate bounds structure before casting
-      if (!heightHash || typeof heightHash !== 'object') {
+      if (!hashResult || typeof hashResult !== 'object') {
         throw new Error('Invalid data returned from contract: expected object');
       }
 
-      if (heightHash.length !== 3) {
-        throw new Error(`Invalid data returned from contract: expected 3 fields, got ${heightHash.length}`);
+      if (hashResult.length !== 2) {
+        throw new Error(`Invalid data returned from contract: expected 2 fields, got ${hashResult.length}`);
       }
 
-      const heightHashObj: HeightHash = {
-        height: Number(heightHash[0]),
-        hash: heightHash[1],
-        exists: heightHash[2],
+      const hashResultObj: HashResult = {
+        hash: hashResult[0],
+        exists: hashResult[1],
       };
 
-      return heightHashObj;
+      return hashResultObj;
     } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }

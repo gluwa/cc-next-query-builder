@@ -6,6 +6,7 @@ import { ContinuityProof, TransactionMerkleProof } from '../proof-generator';
 const contractABI = BlockProverABI as unknown as InterfaceAbi;
 
 export interface BlockProvingProvider {
+  computeTransactionIndex(merkleProof: TransactionMerkleProof): Promise<number>;
   verifySingle(
     chainKey: number,
     height: number,
@@ -27,6 +28,7 @@ export interface BlockProvingProvider {
  */
 export const BLOCK_PROVER_PRECOMPILE_ADDRESS = '0x0000000000000000000000000000000000000FD2';
 
+const CALCULATE_TX_INDEX = 'calculateTxIndex((bytes32,(bytes32,bool)[]))';
 const VERIFY_SINGLE = 'verify(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
 const VERIFY_BATCH = 'verify(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
 
@@ -49,6 +51,38 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    */
   constructor(rpc: JsonRpcApiProvider, blockProverPrecompile: string = BLOCK_PROVER_PRECOMPILE_ADDRESS) {
     this.blockProverContract = new Contract(blockProverPrecompile, contractABI, rpc);
+  }
+
+  /**
+   * Calculates the transaction index within a block using the provided Merkle proof.
+   *
+   * @param merkleProof - The Merkle proof for the transaction inclusion
+   * @returns The index of the transaction within the block
+   * @throws Error if the computation call fails
+   *
+   * @example
+   * ```typescript
+   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * expect(proofResult.success).toBe(true);
+   *
+   * // Proof generation was successful, extract data and compute transaction index
+   * const proofData = proofResult.data!;
+   * const blockProver = new proof.blockProver.PrecompileBlockProver(rpcProvider);
+   * const txIndex = await blockProver.computeTransactionIndex(proofData.merkleProof);
+   * console.log(`Transaction index within block: ${txIndex}`);
+   * ```
+   */
+  public async computeTransactionIndex(merkleProof: TransactionMerkleProof): Promise<number> {
+    const method: ContractMethod = this.blockProverContract.getFunction(CALCULATE_TX_INDEX);
+
+    try {
+      return await method.staticCall(merkleProof);
+    } catch (error: any) {
+      console.error(`Error trying to compute transaction index: ${error.shortMessage}`);
+      throw error;
+    }
   }
 
   /**
