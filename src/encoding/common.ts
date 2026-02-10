@@ -44,7 +44,13 @@ export async function getTransactionWithRaw(
   provider: JsonRpcApiProvider,
   txHash: string,
 ): Promise<TransactionWithRaw | null> {
-  const json = await provider.send('eth_getTransactionByHash', [txHash]);
+  let json: any;
+  try {
+    json = await provider.send('eth_getTransactionByHash', [txHash]);
+  } catch (e) {
+    console.error(`Error fetching transaction ${txHash}: ${(e as Error).message}`);
+    return null;
+  }
 
   if (!json) {
     return null;
@@ -53,11 +59,11 @@ export async function getTransactionWithRaw(
   const formattedTx = provider._wrapTransactionResponse(json, await provider.getNetwork());
   // We map the raw yParity values from the JSON response
   // to a numeric value in RawAuthorization array
-  const mappendList =
+  const rawAuthorizationList =
     json.authorizationList?.map((auth: any) => ({
       yParity: Number(auth.yParity),
     })) || null;
-  const rawTx = new RawTransactionResponse(mappendList);
+  const rawTx = new RawTransactionResponse(rawAuthorizationList);
 
   return new TransactionWithRaw(formattedTx, rawTx);
 }

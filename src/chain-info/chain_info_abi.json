@@ -28,6 +28,11 @@
           },
           {
             "internalType": "bool",
+            "name": "isAttestation",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
             "name": "exists",
             "type": "bool"
           }
@@ -66,6 +71,11 @@
             "internalType": "bytes32",
             "name": "hash",
             "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "isAttestation",
+            "type": "bool"
           },
           {
             "internalType": "bool",
@@ -167,6 +177,42 @@
         "internalType": "uint64",
         "name": "chainKey",
         "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "digest",
+        "type": "bytes32"
+      }
+    ],
+    "name": "get_attestation_height_for_digest",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint64",
+            "name": "height",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "exists",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct HeightResult",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "chainKey",
+        "type": "uint64"
       }
     ],
     "name": "get_chain_by_key",
@@ -220,6 +266,42 @@
         "internalType": "uint64",
         "name": "chainKey",
         "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "height",
+        "type": "uint64"
+      }
+    ],
+    "name": "get_checkpoint_for_height",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "hash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "exists",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct HashResult",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "chainKey",
+        "type": "uint64"
       }
     ],
     "name": "get_latest_attestation_height_and_hash",
@@ -235,6 +317,11 @@
             "internalType": "bytes32",
             "name": "hash",
             "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "isAttestation",
+            "type": "bool"
           },
           {
             "internalType": "bool",
@@ -271,6 +358,11 @@
             "internalType": "bytes32",
             "name": "hash",
             "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "isAttestation",
+            "type": "bool"
           },
           {
             "internalType": "bool",

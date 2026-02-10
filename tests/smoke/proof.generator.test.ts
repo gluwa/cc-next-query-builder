@@ -153,30 +153,24 @@ class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvide
 }
 
 class MockContinuityProvider implements chainInfo.ChainInfoProvider {
-  private upperBound: chainInfo.ContinuityBound | null = null;
-  private lowerBound: chainInfo.ContinuityBound | null = null;
+  private bound: chainInfo.ContinuityBounds | null = null;
 
-  public setUpperBound(blockNumber: number) {
-    this.upperBound = {
-      blockNumber: blockNumber,
-      digest: keccak256(Buffer.from(`continuity_upper_bound_${blockNumber}`)),
-    };
-  }
-
-  public setLowerBound(blockNumber: number) {
-    this.lowerBound = {
-      blockNumber: blockNumber,
-      digest: keccak256(Buffer.from(`continuity_lower_bound_${blockNumber}`)),
-    };
+  public setBound(bound: chainInfo.ContinuityBounds) {
+    this.bound = bound;
   }
 
   public async getContinuityBounds(_chainKey: number, _height: number): Promise<chainInfo.ContinuityBounds> {
-    return { lowerBound: this.lowerBound, upperBound: this.upperBound };
+    return this.bound!;
   }
 
   public async getSupportedChains(): Promise<chainInfo.ChainInfo[]> {
     throw new Error('Method not implemented.');
   }
+
+  public async getSupportedChainByKey(chainKey: number): Promise<chainInfo.ChainInfo | null> {
+    throw new Error('Method not implemented.');
+  }
+
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<chainInfo.HeightHash> {
     throw new Error('Method not implemented.');
   }
@@ -192,6 +186,14 @@ class MockContinuityProvider implements chainInfo.ChainInfoProvider {
   ): Promise<void> {
     return;
   }
+
+  public async getAttestationHeightForDigest(_chainKey: number, _digest: string): Promise<chainInfo.HeightResult> {
+    throw new Error('Method not implemented.');
+  }
+
+  public async getCheckpointForHeight(_chainKey: number, _height: number): Promise<chainInfo.HeightHash> {
+    throw new Error('Method not implemented.');
+  }
 }
 
 test('RawProofGenerator: should return proof', async () => {
@@ -204,8 +206,15 @@ test('RawProofGenerator: should return proof', async () => {
   blockProvider.addBlocks(0, 20);
   blockProvider.setBlockNumber(20);
 
-  continuityProvider.setLowerBound(0);
-  continuityProvider.setUpperBound(20);
+  continuityProvider.setBound({
+    parentHeight: 0,
+    parentHash: '',
+    parentIsAttestation: true,
+    childHeight: 20,
+    childHash: '',
+    childIsAttestation: true,
+    isAttested: true,
+  });
 
   const block = await blockProvider.getBlockWithReceipts(11);
   const txHash = block.block.transactions[0];
@@ -246,7 +255,15 @@ test('RawProofGenerator: return error if no lower bound', async () => {
   blockProvider.setBlockNumber(10);
 
   // We set only upper bound to 20
-  continuityProvider.setUpperBound(20);
+  continuityProvider.setBound({
+    parentHeight: 0,
+    parentHash: '',
+    parentIsAttestation: false,
+    childHeight: 20,
+    childHash: '',
+    childIsAttestation: true,
+    isAttested: false,
+  });
 
   // We try to generate a proof for the first transaction in block 10
   const block = await blockProvider.getBlockWithReceipts(10);
@@ -260,7 +277,7 @@ test('RawProofGenerator: return error if no lower bound', async () => {
   // Expect an error since lower bound is missing
   expect(result.success).toBe(false);
   expect(result.error).toBe(
-    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper bounds',
+    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper continuity bounds',
   );
 });
 
@@ -276,7 +293,15 @@ test('RawProofGenerator: return error if no upper bound', async () => {
   blockProvider.setBlockNumber(10);
 
   // We set only lower bound to 0
-  continuityProvider.setLowerBound(0);
+  continuityProvider.setBound({
+    parentHeight: 0,
+    parentHash: '',
+    parentIsAttestation: true,
+    childHeight: 0,
+    childHash: '',
+    childIsAttestation: false,
+    isAttested: false,
+  });
 
   // We try to generate a proof for the first transaction in block 10
   const block = await blockProvider.getBlockWithReceipts(10);
@@ -290,7 +315,7 @@ test('RawProofGenerator: return error if no upper bound', async () => {
   // Expect an error since upper bound is missing
   expect(result.success).toBe(false);
   expect(result.error).toBe(
-    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper bounds',
+    'Failed to build continuity proof: Cannot build continuity proof for height 10 without both lower and upper continuity bounds',
   );
 });
 
@@ -307,8 +332,15 @@ test('RawProofGenerator: return error if upper bound is above current block heig
 
   // We set lower bound to 0 and upper bound to 20 meaning that we have attestations/checkpoints
   // all the way from block 0 to block 20
-  continuityProvider.setLowerBound(0);
-  continuityProvider.setUpperBound(20);
+  continuityProvider.setBound({
+    parentHeight: 0,
+    parentHash: '',
+    parentIsAttestation: true,
+    childHeight: 20,
+    childHash: '',
+    childIsAttestation: true,
+    isAttested: true,
+  });
 
   // We try to generate a proof for the first transaction in block 10
   const block = await blockProvider.getBlockWithReceipts(10);
@@ -340,11 +372,23 @@ test.skip('E2E ProofGenerator integration test', async () => {
   const chainInfos = await chainInfoProvider.getSupportedChains();
   console.log('Supported chains from continuity provider:', chainInfos);
 
+  const chainResult = await chainInfoProvider.getSupportedChainByKey(2);
+  console.log('Chain info for chain key 2:', chainResult);
+
+  const genesisHeight = await chainInfoProvider.getAttestationGenesisHeight(2);
+  console.log('Genesis attestation height for chain key 2:', genesisHeight);
+
   const latestHeightHash = await chainInfoProvider.getLatestAttestedHeightAndHash(2);
   console.log('Latest attested height and hash for chain key 2:', latestHeightHash);
 
-  const genesisHeightHash = await chainInfoProvider.getAttestationGenesisHeight(2);
-  console.log('Genesis attestation height for chain key 2:', genesisHeightHash);
+  const continuityBounds = await chainInfoProvider.getContinuityBounds(2, latestHeightHash.height);
+  console.log('Continuity bounds for latest attested height:', continuityBounds);
+
+  const attestationHeightResult = await chainInfoProvider.getAttestationHeightForDigest(2, latestHeightHash.hash);
+  console.log('Attestation height result for latest attested hash:', attestationHeightResult);
+
+  const checkpointDigest = await chainInfoProvider.getCheckpointForHeight(2, genesisHeight);
+  console.log('Checkpoint digest for genesis height:', checkpointDigest);
 
   // NOTE: Replace with your test chain key
   const chainKey = 2;
@@ -352,8 +396,8 @@ test.skip('E2E ProofGenerator integration test', async () => {
   // Initialize BlockProver contract instance from local creditcoin chain
   const prover = new blockProver.PrecompileBlockProver(ccProvider);
 
-  // NOTE: Replace with a valid transaction hash from your local source chain
-  const txHash1 = '0x2d83504d496cb9e4a7f801c7a516aa9b6144b73e39e52f8c2934ae20e1e83c74';
+  // NOTE: Replace with valid transaction hashes from your local source chain
+  const txHash1 = '0x1fd15cc75e4ef16c7e4cec1d2b73e80a599aaa174e44e220fa14143da8ad76be';
   const txBlock1 = await ethProvider.getTransaction(txHash1).then((tx) => tx?.blockNumber);
   const txHash2 = '0x6fe777442b70a5511f3c443176ae860e50445bd93b663711717996a70c5022ab';
   const txBlock2 = await ethProvider.getTransaction(txHash2).then((tx) => tx?.blockNumber);
@@ -362,8 +406,9 @@ test.skip('E2E ProofGenerator integration test', async () => {
   console.log(`Transaction 2 is in block ${txBlock2}`);
 
   // We await the highest block to be attested before generating proofs
-  console.log(`Waiting for block ${latestHeightHash.height} to be attestated...`);
-  await chainInfoProvider.waitUntilHeightAttested(chainKey, Math.max(txBlock1!, txBlock2!));
+  const blockToWait = Math.max(txBlock1!, txBlock2!);
+  console.log(`Waiting for block ${blockToWait} to be attestated...`);
+  await chainInfoProvider.waitUntilHeightAttested(chainKey, blockToWait);
 
   // First we test with the raw proof generator
   const rawProofGenerator = new proofGenerator.raw.RawProofGenerator(
@@ -376,13 +421,16 @@ test.skip('E2E ProofGenerator integration test', async () => {
   expect(rawProofResult.success).toBe(true);
 
   const proofData = rawProofResult.data!;
+
+  const txIndex = await prover.computeTransactionIndex(proofData.merkleProof);
+  console.log(`Calculated transaction index from merkle proof: ${txIndex}`);
+
   const proveResultRaw = await prover.verifySingle(
     proofData.chainKey,
     proofData.headerNumber,
     proofData.txBytes,
     proofData.merkleProof,
     proofData.continuityProof,
-    true,
   );
   expect(proveResultRaw).toBe(true);
 
@@ -394,19 +442,12 @@ test.skip('E2E ProofGenerator integration test', async () => {
   expect(apiProofResult_1.success).toBe(true);
 
   const apiProofData_1 = apiProofResult_1.data!;
-
-  const a: [number, proofGenerator.ContinuityProof][] = [apiProofData_1].map((data) => [
-    data.headerNumber,
-    data.continuityProof,
-  ]);
-
   const proveResultApi_1 = await prover.verifySingle(
     apiProofData_1.chainKey,
     apiProofData_1.headerNumber,
     apiProofData_1.txBytes,
     apiProofData_1.merkleProof,
     apiProofData_1.continuityProof,
-    true,
   );
   expect(proveResultApi_1).toBe(true);
 
@@ -420,16 +461,12 @@ test.skip('E2E ProofGenerator integration test', async () => {
   ];
 
   const mergedProof = proofGenerator.mergeProofs(numberedProofs);
-
-  console.log(JSON.stringify(mergedProof, null, 2));
-
   const proveResultApi_2 = await prover.verifyBatch(
     apiProofData_1.chainKey,
     [apiProofData_1.headerNumber, apiProofData_2.headerNumber],
     [apiProofData_1.txBytes, apiProofData_2.txBytes],
     [apiProofData_1.merkleProof, apiProofData_2.merkleProof],
     mergedProof,
-    true,
   );
   expect(proveResultApi_2).toBe(true);
 }, 120_000);
