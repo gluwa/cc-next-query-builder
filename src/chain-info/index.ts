@@ -1,6 +1,6 @@
 import { Contract, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
 
-import ChainInfoABI from './chain_info_abi.json';
+import ChainInfoABI from './chain_info.json';
 
 const contractABI = ChainInfoABI as unknown as InterfaceAbi;
 
