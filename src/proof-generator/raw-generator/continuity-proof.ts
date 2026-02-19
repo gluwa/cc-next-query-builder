@@ -96,7 +96,7 @@ export class ContinuityProofBuilder {
   }
 
   /**
-   * Builds a ContinuityProof for a specific block height.
+   * Builds a ContinuityProof for a block height range.
    *
    * Building the proof requires fetching attestations and checkpoints from the chain,
    * determining the appropriate bounds, and constructing the continuity blocks.
@@ -108,9 +108,10 @@ export class ContinuityProofBuilder {
    * If the proof cannot be built (e.g. no attestations exist, bounds cannot be found, etc),
    * **the method will throw an error**.
    *
-   * @param queryHeight The block height for which to build the continuity proof (must be >= attestation genesis height)
-   * @returns A Promise that resolves to a ContinuityProof object representing the proof for the given height
-   * @throws Error if queryHeight is below genesis height, bounds cannot be found, or chain data is unavailable
+   * @param fromHeight The starting block height for which to build the continuity proof (must be >= attestation genesis height)
+   * @param toHeight The ending block height for which to build the continuity proof (must be > fromHeight) or null to build only for fromHeight
+   * @returns A Promise that resolves to a ContinuityProof object representing the proof for the given height range
+   * @throws Error if fromHeight is below genesis height, bounds cannot be found, or chain data is unavailable
    *
    * @example
    * ```typescript
@@ -122,7 +123,7 @@ export class ContinuityProofBuilder {
    * );
    *
    * try {
-   *   const proof = await builder.createForHeight(12345);
+   *   const proof = await builder.createForHeights(12345);
    *   console.log('Proof created:', proof);
    *   // Use proof for verification or submission
    * } catch (error) {
@@ -130,30 +131,62 @@ export class ContinuityProofBuilder {
    * }
    * ```
    */
-  public async createForHeight(queryHeight: number): Promise<ContinuityProof> {
+  public async createForHeights(fromHeight: number, toHeight: number | null = null): Promise<ContinuityProof> {
     const genesisHeight = await this.chainInfoProvider.getAttestationGenesisHeight(this.chainKey);
-    if (queryHeight < genesisHeight) {
+    if (fromHeight < genesisHeight) {
       throw new Error(
-        `Cannot build continuity proof for height ${queryHeight} below attestation genesis height ${genesisHeight}`,
+        `Cannot build continuity proof for height ${fromHeight} below attestation genesis height ${genesisHeight}`,
       );
+    }
+
+    if (toHeight !== null && toHeight <= fromHeight) {
+      throw new Error(`toHeight ${toHeight} must be greater than fromHeight ${fromHeight}`);
     }
 
     // Fetch attestation bounds from the attestation provider
-    const bounds = await this.chainInfoProvider.getContinuityBounds(this.chainKey, queryHeight);
-    if (!bounds.isAttested) {
+    const fromBounds = await this.chainInfoProvider.getContinuityBounds(this.chainKey, fromHeight);
+    if (!fromBounds.isAttested) {
       throw new Error(
-        `Cannot build continuity proof for height ${queryHeight} without both lower and upper continuity bounds`,
+        `Cannot build continuity proof for height ${fromHeight} without both lower and upper continuity bounds`,
       );
     }
     console.log(
-      `Found attestation bounds for height ${queryHeight}: lower=${bounds.parentHeight}, upper=${bounds.childHeight}`,
+      `Found attestation bounds for height ${fromHeight}: lower=${fromBounds.parentHeight}, upper=${fromBounds.childHeight}`,
     );
 
-    // Using those bounds build the continuity blocks
-    const blocks: AttestationBlock[] = await this.buildAndTrimContinuityFor(queryHeight, bounds);
-    console.log(`Built ${blocks.length} continuity blocks for height ${queryHeight}`);
-    // Finally convert to ContinuityProof
-    return ContinuityProofBuilder.createFrom(blocks);
+    if (toHeight !== null) {
+      const toBounds = await this.chainInfoProvider.getContinuityBounds(this.chainKey, toHeight);
+      if (!toBounds.isAttested) {
+        throw new Error(
+          `Cannot build continuity proof for height ${toHeight} without both lower and upper continuity bounds`,
+        );
+      }
+      console.log(
+        `Found attestation bounds for height ${toHeight}: lower=${toBounds.parentHeight}, upper=${toBounds.childHeight}`,
+      );
+
+      const combinedBounds: ContinuityBounds = {
+        parentHeight: fromBounds.parentHeight,
+        parentHash: fromBounds.parentHash,
+        parentIsAttestation: fromBounds.parentIsAttestation,
+        childHeight: toBounds.childHeight,
+        childHash: toBounds.childHash,
+        childIsAttestation: toBounds.childIsAttestation,
+        isAttested: fromBounds.isAttested && toBounds.isAttested,
+      };
+
+      // Using those bounds build the continuity blocks
+      const blocks: AttestationBlock[] = await this.buildAndTrimContinuityFor(fromHeight, combinedBounds);
+      console.log(`Built ${blocks.length} continuity blocks for height ${fromHeight}`);
+      // Finally convert to ContinuityProof
+      return ContinuityProofBuilder.createFrom(blocks);
+    } else {
+      // Using those bounds build the continuity blocks
+      const blocks: AttestationBlock[] = await this.buildAndTrimContinuityFor(fromHeight, fromBounds);
+      console.log(`Built ${blocks.length} continuity blocks for height ${fromHeight}`);
+      // Finally convert to ContinuityProof
+      return ContinuityProofBuilder.createFrom(blocks);
+    }
   }
 
   private async buildAndTrimContinuityFor(queryHeight: number, bounds: ContinuityBounds): Promise<AttestationBlock[]> {
@@ -213,17 +246,43 @@ export class ContinuityProofBuilder {
 
     const blockNumbers = Array.from({ length: blockCount }, (_, i) => buildStartHeight + i);
 
-    // Add delay between requests to avoid overwhelming the provider
+    let blocksRetrieved = 0;
+    let blockPromises = [];
+
+    // Add delay between request batches to avoid overwhelming the provider
     const blocksWithReceipt = [];
     for (const blockNumber of blockNumbers) {
-      const block = await this.blockProvider.getBlockWithReceipts(blockNumber);
+      blockPromises.push(this.blockProvider.getBlockWithReceipts(blockNumber));
+      blocksRetrieved++;
 
-      if (block) {
-        blocksWithReceipt.push(block);
+      if (blockPromises.length % 20 === 0) {
+        console.log(`Retrieved ${blocksRetrieved}/${blockCount} blocks for continuity proof...`);
+
+        const blocks = await Promise.all(blockPromises);
+
+        for (const block of blocks) {
+          if (block) {
+            blocksWithReceipt.push(block);
+          }
+        }
+
+        blockPromises = [];
+
+        // Small delay to prevent rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
+    }
 
-      // Small delay to prevent rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 10));
+    if (blockPromises.length > 0) {
+      console.log(`Retrieved ${blocksRetrieved}/${blockCount} blocks for continuity proof...`);
+
+      const blocks = await Promise.all(blockPromises);
+
+      for (const block of blocks) {
+        if (block) {
+          blocksWithReceipt.push(block);
+        }
+      }
     }
 
     let prevDigest = lowerDigest;

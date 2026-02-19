@@ -240,7 +240,7 @@ test('RawProofGenerator: should return error for non-existent transaction', asyn
 
   // Expect an error since transaction does not exist
   expect(result.success).toBe(false);
-  expect(result.error).toBe(`Transaction ${transactionHash} not found`);
+  expect(result.error).toBe(`Failed to generate merkle proof: Transaction ${transactionHash} not found`);
 });
 
 test('RawProofGenerator: return error if no lower bound', async () => {
@@ -369,29 +369,31 @@ test.skip('E2E ProofGenerator integration test', async () => {
   const ccProvider = new JsonRpcProvider(ccRpc);
   const chainInfoProvider = new chainInfo.PrecompileChainInfoProvider(ccProvider);
 
+  const chainKey = 2; // NOTE: Replace with your test chain key
+
   const chainInfos = await chainInfoProvider.getSupportedChains();
   console.log('Supported chains from continuity provider:', chainInfos);
 
-  const chainResult = await chainInfoProvider.getSupportedChainByKey(2);
-  console.log('Chain info for chain key 2:', chainResult);
+  const chainResult = await chainInfoProvider.getSupportedChainByKey(chainKey);
+  console.log(`Chain info for chain key ${chainKey}:`, chainResult);
 
-  const genesisHeight = await chainInfoProvider.getAttestationGenesisHeight(2);
-  console.log('Genesis attestation height for chain key 2:', genesisHeight);
+  const genesisHeight = await chainInfoProvider.getAttestationGenesisHeight(chainKey);
+  console.log(`Genesis attestation height for chain key ${chainKey}:`, genesisHeight);
 
-  const latestHeightHash = await chainInfoProvider.getLatestAttestedHeightAndHash(2);
-  console.log('Latest attested height and hash for chain key 2:', latestHeightHash);
+  const latestHeightHash = await chainInfoProvider.getLatestAttestedHeightAndHash(chainKey);
+  console.log(`Latest attested height and hash for chain key ${chainKey}:`, latestHeightHash);
 
-  const continuityBounds = await chainInfoProvider.getContinuityBounds(2, latestHeightHash.height);
-  console.log('Continuity bounds for latest attested height:', continuityBounds);
+  const continuityBounds = await chainInfoProvider.getContinuityBounds(chainKey, latestHeightHash.height);
+  console.log(`Continuity bounds for latest attested height for chain key ${chainKey}:`, continuityBounds);
 
-  const attestationHeightResult = await chainInfoProvider.getAttestationHeightForDigest(2, latestHeightHash.hash);
-  console.log('Attestation height result for latest attested hash:', attestationHeightResult);
+  const attestationHeightResult = await chainInfoProvider.getAttestationHeightForDigest(
+    chainKey,
+    latestHeightHash.hash,
+  );
+  console.log(`Attestation height result for latest attested hash for chain key ${chainKey}:`, attestationHeightResult);
 
-  const checkpointDigest = await chainInfoProvider.getCheckpointForHeight(2, genesisHeight);
-  console.log('Checkpoint digest for genesis height:', checkpointDigest);
-
-  // NOTE: Replace with your test chain key
-  const chainKey = 2;
+  const checkpointDigest = await chainInfoProvider.getCheckpointForHeight(chainKey, genesisHeight);
+  console.log(`Checkpoint digest for genesis height for chain key ${chainKey}:`, checkpointDigest);
 
   // Initialize BlockProver contract instance from local creditcoin chain
   const prover = new blockProver.PrecompileBlockProver(ccProvider);
@@ -451,22 +453,29 @@ test.skip('E2E ProofGenerator integration test', async () => {
   );
   expect(proveResultApi_1).toBe(true);
 
-  const apiProofResult_2 = await apiProvider.generateProof(txHash2);
-  expect(apiProofResult_2.success).toBe(true);
-  const apiProofData_2 = apiProofResult_2.data!;
+  const apiProofBatchResult = await apiProvider.generateBatchProof([txHash1, txHash2]);
+  expect(apiProofBatchResult.success).toBe(true);
+  const batchProofData = apiProofBatchResult.data!;
 
-  const numberedProofs: [number, proofGenerator.ContinuityProof][] = [
-    [apiProofData_1.headerNumber, apiProofData_1.continuityProof],
-    [apiProofData_2.headerNumber, apiProofData_2.continuityProof],
-  ];
+  // Prepare batch proof data for verification by organizing it into arrays of headers, txBytes, and merkleProofs
+  // corresponding to each transaction in the batch
+  const headers = [];
+  const txBytes = [];
+  const merkleProofs = [];
+  for (const [headerNumber, proofsMap] of batchProofData.merkleProofs.entries()) {
+    for (const [_txIndex, proofEntry] of proofsMap.entries()) {
+      headers.push(headerNumber);
+      txBytes.push(proofEntry.txBytes);
+      merkleProofs.push(proofEntry.merkleProof);
+    }
+  }
 
-  const mergedProof = proofGenerator.mergeProofs(numberedProofs);
-  const proveResultApi_2 = await prover.verifyBatch(
-    apiProofData_1.chainKey,
-    [apiProofData_1.headerNumber, apiProofData_2.headerNumber],
-    [apiProofData_1.txBytes, apiProofData_2.txBytes],
-    [apiProofData_1.merkleProof, apiProofData_2.merkleProof],
-    mergedProof,
+  const proveResultBatch = await prover.verifyBatch(
+    batchProofData.chainKey,
+    headers,
+    txBytes,
+    merkleProofs,
+    batchProofData.continuityProof,
   );
-  expect(proveResultApi_2).toBe(true);
+  expect(proveResultBatch).toBe(true);
 }, 120_000);

@@ -1,15 +1,24 @@
-import { ProofGenerationResult, ProofGenerator } from '..';
+import { BatchMerkleProofEntry, BatchProofGenerationResult, ProofGenerationResult, ProofGenerator } from '..';
 import { ChainInfoProvider } from '../../chain-info';
 
 import { abiEncode, EncodingVersion } from '../../encoding';
 
 import { ContinuityProofBuilder } from './continuity-proof';
-import { KeccakMerkleTree } from '../merkle';
+import { KeccakMerkleTree, TransactionMerkleProof } from '../merkle';
 import { BlockProvider } from './block-provider';
 
 // Re-export for easier access
 export * as blockProvider from './block-provider';
 export { EncodingVersion } from '../../encoding';
+
+interface MerkleProofGenerationResult {
+  success: boolean;
+  txIndex?: number;
+  txBytes?: string;
+  blockNumber?: number;
+  merkleProof?: TransactionMerkleProof;
+  error?: string;
+}
 
 /**
  * RawProofGenerator generates raw proofs for a given transaction.
@@ -38,7 +47,7 @@ export class RawProofGenerator implements ProofGenerator {
     this.builder = new ContinuityProofBuilder(this.blockProvider, this.chainInfoProvider, chainKey, encoding);
   }
 
-  public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
+  private async generateMerkleProofFor(transactionHash: string): Promise<MerkleProofGenerationResult> {
     // First we need to create merkle proof for the transaction block
     const tx = await this.blockProvider.getTransaction(transactionHash);
     if (!tx) {
@@ -99,19 +108,88 @@ export class RawProofGenerator implements ProofGenerator {
     const tree = new KeccakMerkleTree(encodedTx);
     const merkleProof = tree.generateProof(txIndex);
 
+    return {
+      success: true,
+      txIndex,
+      txBytes: encodedTx[txIndex],
+      blockNumber,
+      merkleProof,
+    };
+  }
+
+  public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
+    const merkleProofResult = await this.generateMerkleProofFor(transactionHash);
+
+    if (!merkleProofResult.success) {
+      return { success: false, error: `Failed to generate merkle proof: ${merkleProofResult.error}` };
+    }
+
     try {
-      const continuityProof = await this.builder.createForHeight(blockNumber);
+      const continuityProof = await this.builder.createForHeights(merkleProofResult.blockNumber!);
 
       return {
         success: true,
         data: {
           chainKey: this.chainKey,
-          headerNumber: blockNumber,
-          txIndex: txIndex,
+          headerNumber: merkleProofResult.blockNumber!,
+          txIndex: merkleProofResult.txIndex!,
           txHash: transactionHash,
-          txBytes: encodedTx[txIndex],
+          txBytes: merkleProofResult.txBytes!,
           continuityProof: continuityProof,
-          merkleProof: merkleProof,
+          merkleProof: merkleProofResult.merkleProof!,
+          cached: false,
+          generatedAt: new Date(),
+        },
+      };
+    } catch (e) {
+      return { success: false, error: `Failed to build continuity proof: ${(e as Error).message}` };
+    }
+  }
+
+  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult> {
+    if (transactionHashes.length === 0) {
+      return { success: false, error: 'No transaction hashes provided for batch proof generation' };
+    }
+
+    // Remove duplicated items from transactionHashes
+    const uniqueTransactionHashes = Array.from(new Set(transactionHashes));
+
+    const merkleProofResults = await Promise.all(
+      uniqueTransactionHashes.map(async (hash) => await this.generateMerkleProofFor(hash)),
+    );
+
+    const successfulResults = merkleProofResults.filter((result) => result.success);
+
+    console.log(`Generated merkle proofs for ${successfulResults} transactions in batch request`);
+
+    const fromHeader = Math.min(...successfulResults.map((result) => result.blockNumber!));
+    const toHeader = Math.max(...successfulResults.map((result) => result.blockNumber!));
+
+    const merkleProofsMap: Map<number, Map<number, BatchMerkleProofEntry>> = new Map();
+
+    for (const result of successfulResults) {
+      if (!merkleProofsMap.has(result.blockNumber!)) {
+        merkleProofsMap.set(result.blockNumber!, new Map());
+      }
+
+      merkleProofsMap.get(result.blockNumber!)!.set(result.txIndex!, {
+        txHash: transactionHashes[merkleProofResults.indexOf(result)],
+        txBytes: result.txBytes!,
+        merkleProof: result.merkleProof!,
+      });
+    }
+
+    try {
+      const continuityProof = await this.builder.createForHeights(fromHeader, toHeader);
+
+      return {
+        success: true,
+        data: {
+          chainKey: this.chainKey,
+          fromHeader,
+          toHeader,
+          continuityProof: continuityProof,
+          merkleProofs: merkleProofsMap,
           cached: false,
           generatedAt: new Date(),
         },
