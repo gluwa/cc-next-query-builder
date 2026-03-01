@@ -158,7 +158,7 @@ jobs:
           sudo apt-get install colordiff unzip
 
       - name: Download encoded data from alloy
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: /var/tmp/encoded-data
           pattern: encoded-by-alloy
@@ -178,7 +178,7 @@ jobs:
           rm -rf *
 
       - name: Download encoded data from ethers
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: /var/tmp/encoded-data
           pattern: encoded-by-ethers
