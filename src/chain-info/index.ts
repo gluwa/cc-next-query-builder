@@ -1,4 +1,5 @@
 import { Contract, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
+import { backOff, BackoffOptions } from 'exponential-backoff';
 
 import ChainInfoABI from './chain_info.json';
 
@@ -408,26 +409,22 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
   ): Promise<void> {
     const startTime = Date.now();
 
-    let errorCount = 0;
+    const backOffOptions = {
+      delayFirstAttempt: true,
+      jitter: 'full',
+      numOfAttempts: 5,
+      startingDelay: 100, // 100ms
+    } as BackoffOptions;
 
     while (true) {
-      try {
-        const heightHash = await this.getLatestAttestedHeightAndHash(chainKey);
-        if (heightHash.exists && heightHash.height >= targetHeight) {
-          return;
-        }
-        errorCount = 0; // reset error count on successful check
-      } catch (error) {
-        console.warn(`Error while checking attestation for chain key ${chainKey} and height ${targetHeight}: ${error}`);
-        errorCount++;
-
-        // If we have too many consecutive errors, we can choose to break early or continue waiting
-        if (errorCount >= 5) {
-          throw new Error(
-            `Encountered ${errorCount} consecutive errors while checking for attestation. Last error: ${error}`,
-          );
-        }
+      const heightHash = await backOff(() => this.getLatestAttestedHeightAndHash(chainKey), backOffOptions);
+      if (heightHash.exists && heightHash.height >= targetHeight) {
+        return;
       }
+
+      console.debug(
+        `Height ${targetHeight} not yet attested on chain key ${chainKey}. Latest attested height is ${heightHash.exists ? heightHash.height : 'N/A'}. Retrying in ${pollIntervalMs}ms...`,
+      );
 
       if (Date.now() - startTime > waitTimeoutMs) {
         throw new Error(`Timeout waiting for height ${targetHeight} to be attested on chain key ${chainKey}`);
