@@ -1,5 +1,8 @@
 export * as raw from './raw-generator';
 export * as api from './api-generator';
+export * as merkle from './merkle';
+
+import { TransactionMerkleProof } from './merkle';
 
 /**
  * A continuity proof used to prove block continuity in the attestation chain.
@@ -69,26 +72,6 @@ export function mergeProofs(proofs: [number, ContinuityProof][]): ContinuityProo
       lowerEndpointDigest: proofs[0][1].lowerEndpointDigest,
       roots: mergedRoots,
     };
-  }
-}
-
-export class TransactionMerkleProof {
-  public root: string;
-  public siblings: MerkleProofEntry[];
-
-  constructor(root: string, siblings: MerkleProofEntry[]) {
-    this.root = root;
-    this.siblings = siblings;
-  }
-}
-
-export class MerkleProofEntry {
-  public hash: string;
-  public isLeft: boolean;
-
-  constructor(hash: string, isLeft: boolean) {
-    this.hash = hash;
-    this.isLeft = isLeft;
   }
 }
 

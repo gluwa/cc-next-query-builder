@@ -1,10 +1,10 @@
 import { ProofGenerationResult, ProofGenerator } from '..';
 import { ChainInfoProvider } from '../../chain-info';
 
-import { abiEncode, EncodingVersion, TransactionWithRaw } from '../../encoding';
+import { abiEncode, EncodingVersion } from '../../encoding';
 
 import { ContinuityProofBuilder } from './continuity-proof';
-import { KeccakMerkleTree } from './merkle';
+import { KeccakMerkleTree } from '../merkle';
 import { BlockProvider } from './block-provider';
 
 // Re-export for easier access

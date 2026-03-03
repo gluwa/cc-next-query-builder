@@ -3,7 +3,7 @@ import { ChainInfoProvider, ContinuityBounds } from '../../chain-info';
 
 import { EncodingVersion } from '../../encoding';
 
-import { computeDigestOf, computeMerkleRootOfBlock } from './merkle';
+import { computeDigestOf, computeMerkleRootOfBlock } from '../merkle';
 import { BlockProvider } from './block-provider';
 
 export class AttestationBlock {
