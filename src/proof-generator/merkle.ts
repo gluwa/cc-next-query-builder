@@ -1,8 +1,26 @@
-import { Block, TransactionResponse, TransactionReceipt, keccak256, solidityPacked } from 'ethers';
+import { TransactionReceipt, keccak256, solidityPacked } from 'ethers';
 
-import { MerkleProofEntry, TransactionMerkleProof } from '..';
+import { abiEncode, EncodingVersion, TransactionWithRaw } from '../encoding';
 
-import { abiEncode, EncodingVersion, TransactionWithRaw } from '../../encoding';
+export class TransactionMerkleProof {
+  public root: string;
+  public siblings: MerkleProofEntry[];
+
+  constructor(root: string, siblings: MerkleProofEntry[]) {
+    this.root = root;
+    this.siblings = siblings;
+  }
+}
+
+export class MerkleProofEntry {
+  public hash: string;
+  public isLeft: boolean;
+
+  constructor(hash: string, isLeft: boolean) {
+    this.hash = hash;
+    this.isLeft = isLeft;
+  }
+}
 
 /**
  * Hashes two child nodes to produce their parent node in the Merkle tree.
@@ -11,7 +29,7 @@ import { abiEncode, EncodingVersion, TransactionWithRaw } from '../../encoding';
  * @param right A 32-byte hex string representing the right child hash
  * @returns A 32-byte hex string representing the parent node hash
  */
-function hashInner(left: string, right: string): string {
+export function hashInner(left: string, right: string): string {
   // Use solidityPacked to exactly match Solidity's abi.encodePacked(uint8(0x01), bytes32, bytes32)
   return keccak256(solidityPacked(['uint8', 'bytes32', 'bytes32'], [0x01, left, right]));
 }
@@ -22,7 +40,7 @@ function hashInner(left: string, right: string): string {
  * @param leaf A 32-byte hex string representing the data to be hashed as a leaf
  * @returns A 32-byte hex string representing the leaf node hash
  */
-function hashLeaf(leaf: string): string {
+export function hashLeaf(leaf: string): string {
   // Use solidityPacked to exactly match Solidity's abi.encodePacked(uint8(0x00), bytes)
   return keccak256(solidityPacked(['uint8', 'bytes'], [0x00, leaf]));
 }
@@ -87,12 +105,13 @@ export function computeMerkleRootOfBlock(
  * @returns The computed digest as a hex string
  */
 export function computeDigestOf(blockNumber: number, merkleRoot: string, prevDigest: string | null): string {
-  const prevDigestNonNull = prevDigest || ZERO_HASH;
-  const digest = keccak256(
-    solidityPacked(['uint64', 'bytes32', 'bytes32'], [blockNumber, merkleRoot, prevDigestNonNull]),
-  );
+  // If prevDigest is provided, include it in the packed encoding
+  if (prevDigest) {
+    return keccak256(solidityPacked(['uint64', 'bytes32', 'bytes32'], [blockNumber, merkleRoot, prevDigest]));
+  }
 
-  return digest;
+  // Otherwise, only use blockNumber and merkleRoot
+  return keccak256(solidityPacked(['uint64', 'bytes32'], [blockNumber, merkleRoot]));
 }
 
 export class KeccakMerkleTree {

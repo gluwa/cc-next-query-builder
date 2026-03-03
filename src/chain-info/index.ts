@@ -408,10 +408,25 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
   ): Promise<void> {
     const startTime = Date.now();
 
+    let errorCount = 0;
+
     while (true) {
-      const heightHash = await this.getLatestAttestedHeightAndHash(chainKey);
-      if (heightHash.exists && heightHash.height >= targetHeight) {
-        return;
+      try {
+        const heightHash = await this.getLatestAttestedHeightAndHash(chainKey);
+        if (heightHash.exists && heightHash.height >= targetHeight) {
+          return;
+        }
+        errorCount = 0; // reset error count on successful check
+      } catch (error) {
+        console.warn(`Error while checking attestation for chain key ${chainKey} and height ${targetHeight}: ${error}`);
+        errorCount++;
+
+        // If we have too many consecutive errors, we can choose to break early or continue waiting
+        if (errorCount >= 5) {
+          throw new Error(
+            `Encountered ${errorCount} consecutive errors while checking for attestation. Last error: ${error}`,
+          );
+        }
       }
 
       if (Date.now() - startTime > waitTimeoutMs) {
