@@ -1,16 +1,16 @@
-# cc-next-query-builder
+# Creditcoin's Universal Smart Contract SDK
 
-cc-next-query-builder is a SDK for JS/TS used for interacting with the Creditcoin network through a variety of tools. To
+SDK for JS/TS used for interacting with the Creditcoin network through a variety of tools. To
 use it simply add the following packaged to your dependencies:
 
 ```sh
-npm install @gluwa/cc-next-query-builder
+npm install @gluwa/usc-sdk
 ```
 
 or with yarn
 
 ```sh
-yarn add @gluwa/cc-next-query-builder
+yarn add @gluwa/usc-sdk
 ```
 
 ## Transaction verification
@@ -23,7 +23,7 @@ chains from which transactions can be proven along with helpers for keeping trac
 The `PrecompileChainInfoProvider` interacts with Creditcoin's ChainInfo precompile contract to retrieve information about supported chains, attestation data, and continuity bounds. This component is essential for understanding the current state of cross-chain attestations.
 
 ```js
-import { chainInfo } from '@gluwa/cc-next-query-builder';
+import { chainInfo } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 const provider = new JsonRpcProvider('https://rpc.usc-testnet2.creditcoin.network');
@@ -46,7 +46,7 @@ await chainInfoProvider.waitUntilHeightAttested(chainKey, targetHeight);
 The `ProverAPIProofGenerator` provides a convenient way to generate proofs by communicating with remote proof generation API servers. This component handles HTTP communication and provides a clean interface for fetching pre-computed proofs.
 
 ```js
-import { proofGenerator } from '@gluwa/cc-next-query-builder';
+import { proofGenerator } from '@gluwa/usc-sdk';
 
 const chainKey = 2; // Example supported chain key
 const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
@@ -66,7 +66,7 @@ if (proofResult.success) {
 The `PrecompileBlockProver` provides on-chain verification capabilities for transaction proofs. It can verify both single transactions and batches of transactions using Merkle proofs and continuity proofs.
 
 ```js
-import { blockProver } from '@gluwa/cc-next-query-builder';
+import { blockProver } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 const provider = new JsonRpcProvider('https://rpc.usc-testnet2.creditcoin.network');
@@ -104,7 +104,7 @@ const batchResult = await prover.verifyBatch(
 Here's an example showing how to use the proof generator components together:
 
 ```js
-import { chainInfo, blockProver, proofGenerator } from '@gluwa/cc-next-query-builder';
+import { chainInfo, blockProver, proofGenerator } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 const chainKey = 2;
@@ -155,7 +155,7 @@ The `QueryBuilder` is used to extract result segments from transactions which ca
 Get the ethers transation and transaction receipt objects for the transactions from where you want to compose the query.
 
 ```js
-import { queryBuilder, encoding } from '@gluwa/cc-next-query-builder';
+import { queryBuilder, encoding } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 const provider = new JsonRpcProvider('https://sepolia.infura.io/v3/<api_key>');

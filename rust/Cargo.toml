@@ -13,21 +13,20 @@ path = "bin/encode_blocks.rs"
 
 [dependencies]
 anyhow = "1.0"
-ccnext-abi-encoding = { version = "0.5.0" }
 clap = { version = "4.5.56", features = ["derive"] }
 tokio = { version = "1.50.0", features = [
-    "macros",
-    "rt-multi-thread",
-    "time",
-    "signal",
+  "macros",
+  "rt-multi-thread",
+  "time",
+  "signal",
 ] }
 futures-util = "0.3.31"
-alloy = { version = "0.11", features = [
-    "provider-ws",
-    "pubsub",
-] }
+alloy = { version = "0.11", features = ["provider-ws", "pubsub"] }
 hex = "0.4.3"
 serde_json = "1.0.149"
+
+# Creditcoin
+usc-abi-encoding = { version = "0.5.0" }
 
 [profile.release]
 # Substrate runtime requires unwinding.
