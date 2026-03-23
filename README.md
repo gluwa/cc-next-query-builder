@@ -1,7 +1,7 @@
 # Creditcoin's Universal Smart Contract SDK
 
 SDK for JS/TS used for interacting with the Creditcoin network through a variety of tools. To
-use it simply add the following packaged to your dependencies:
+use it simply add the following package to your dependencies:
 
 ```sh
 npm install @gluwa/usc-sdk
@@ -152,7 +152,7 @@ if (proofResult.success && proofResult.data) {
 
 The `QueryBuilder` is used to extract result segments from transactions which can be used to validate their contents. To use it follow the example below:
 
-Get the ethers transation and transaction receipt objects for the transactions from where you want to compose the query.
+Get the ethers transaction and transaction receipt objects for the transaction from which you want to compose the query.
 
 ```js
 import { queryBuilder, encoding } from '@gluwa/usc-sdk';
@@ -168,7 +168,7 @@ const builder = queryBuilder.QueryBuilder.createFromTransaction(transaction!, re
 
 ### Setting an ABI provider to decode the calldata and events
 
-Contract specific fields like calldata and events required the ABI from respective contracts in order for the query builder to understand the context of the data. The ABI provider that the query builder needs is essentially a function that receives the contract address and outputs the ABI of that contract address.
+Contract-specific fields like calldata and events require the ABI from the respective contracts in order for the query builder to understand the context of the data. The ABI provider that the query builder needs is essentially a function that receives the contract address and outputs the ABI of that contract address.
 
 ```js
 builder.setAbiProvider(async (contractAddress: string) => {
@@ -216,7 +216,7 @@ builder
   .addStaticField(QueryableFields.TxTo);
 ```
 
-To add fields specific from the calldata, you'll need to use the query builder's add function argument. Please make sure that the contract's address for the calldata is available in the abi provider you've set for the query builder.
+To add calldata-specific fields, you'll need to use the query builder's add function argument. Please make sure that the contract's address for the calldata is available in the abi provider you've set for the query builder.
 Example, we want to include the to and value of a ERC20 transfer calldata
 
 ```js
@@ -253,7 +253,7 @@ await builder.addFunctionArgument('Transfer', 'to');
 await builder.addFunctionArgument('Transfer', 'value');
 ```
 
-To add fields specific for the event, you'll need to use the query builder's eventBuilder.
+To add event-specific fields, you'll need to use the query builder's eventBuilder.
 Please make sure that the contract's address from where the event was emitted is available in the abi provider you've set for the query builder.
 Example, we want to build a query for an ERC20 Transfer event
 

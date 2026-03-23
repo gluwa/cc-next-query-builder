@@ -31,7 +31,7 @@ export class QueryBuilderForFunction {
       const baseOffset = this.dataFieldOffset!.offset + 4; // thats because the data field has the selector in front :)  (4 byte hash)
       this.selectedFields.push({ offset: baseOffset + fieldInsideCallData.offset, size: fieldInsideCallData.size });
     } else {
-      throw new Error(`Trying to get a field that dosen't have a size...`);
+      throw new Error(`Trying to get a field that doesn't have a size.`);
     }
 
     return this;

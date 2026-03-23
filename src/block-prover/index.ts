@@ -34,7 +34,7 @@ const VERIFY_SINGLE = 'verify(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(by
 const VERIFY_BATCH = 'verify(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
 
 /**
- * Implementation of BlockProvingProvider using a link the precompile contract on creditcoin.
+ * Implementation of BlockProvingProvider using the precompile contract on Creditcoin.
  *
  * The prover allows verifying transaction inclusion and block continuity proofs on-chain.
  *
@@ -129,7 +129,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
     try {
       return await method.staticCall(chainKey, height, encodedTransaction, merkleProof, continuityProof);
     } catch (error: any) {
-      console.error(`Error trying to verify query: ${error.shortMessage}`);
+      console.error(`Error trying to verify transaction: ${error.shortMessage}`);
       throw error;
     }
   }
@@ -191,7 +191,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
     try {
       return await method.staticCall(chainKey, heights, encodedTransaction, merkleProofs, sharedProof);
     } catch (error: any) {
-      console.error(`Error trying to verify query: ${error.shortMessage}`);
+      console.error(`Error trying to verify transaction: ${error.shortMessage}`);
       throw error;
     }
   }
