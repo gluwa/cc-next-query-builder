@@ -1103,16 +1103,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ccnext-abi-encoding"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c1270b7f234d783c32bc018bf4b3a826207b5db65df23857b3358a3fbcf07c8"
-dependencies = [
- "alloy",
- "serde",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2772,12 +2762,12 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "anyhow",
- "ccnext-abi-encoding",
  "clap",
  "futures-util",
  "hex",
  "serde_json",
  "tokio",
+ "usc-abi-encoding",
 ]
 
 [[package]]
@@ -3562,6 +3552,16 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
+]
+
+[[package]]
+name = "usc-abi-encoding"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0947967a842b75d2861508af8dd3e634f2c93c94da50acd2495276425811e96d"
+dependencies = [
+ "alloy",
  "serde",
 ]
 

@@ -5,15 +5,17 @@ use alloy::{
 };
 
 use anyhow::Result;
-use ccnext_abi_encoding::abi::abi_encode;
-use ccnext_abi_encoding::common::EncodingVersion;
 use clap::Parser;
 use futures_util::StreamExt;
 use hex;
+
 use std::env;
 use std::fs;
 use std::str::FromStr;
 use std::time::SystemTime;
+
+use usc_abi_encoding::abi::abi_encode;
+use usc_abi_encoding::common::EncodingVersion;
 
 #[derive(Parser, Debug)]
 #[command(name = "encode-blocks")]

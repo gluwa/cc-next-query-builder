@@ -41,7 +41,7 @@ export class QueryBuilderForEvent {
       if (field.size) {
         this.selectedFields.push({ offset: dataField.offset + field.offset, size: field.size! });
       } else {
-        throw new Error(`Could not query this field, it might be because its dynamic and dosen't have a size.`);
+        throw new Error(`Could not query this field, it might be because it's dynamic and doesn't have a size.`);
       }
     }
 

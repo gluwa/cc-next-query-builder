@@ -88,7 +88,7 @@ export class QueryBuilder {
 
   addStaticField(field: QueryableFields) {
     const offset = this.mappedOffsets.get(field);
-    if (!offset) throw new Error(`Could not find field ${field} in transacton type ${this.tx.formatted.type}`);
+    if (!offset) throw new Error(`Could not find field ${field} in transaction type ${this.tx.formatted.type}`);
 
     if (offset.isDynamic)
       throw new Error(`Only static fields can be added with this method, ${field} is a dynamic field ${offset.type}`);
@@ -222,7 +222,7 @@ export class QueryBuilder {
 
     if (matches.length == 1) return matches[0];
 
-    throw new Error(`Ambigious events has been matched. (${matches.length} events found)`);
+    throw new Error(`Ambiguous events matched. (${matches.length} events found)`);
   }
 
   async addEventArgument(

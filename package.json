@@ -1,11 +1,11 @@
 {
-  "name": "@gluwa/cc-next-query-builder",
-  "version": "0.8.0",
+  "name": "@gluwa/usc-sdk",
+  "version": "0.9.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/gluwa/cc-next-query-builder"
   },
-  "description": "sample for ccnext abi encoding PoC",
+  "description": "Typescript SDK for the USC (Universal Smart Contracts) ecosystem on the Gluwa Creditcoin Network",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
