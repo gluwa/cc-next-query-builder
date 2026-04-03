@@ -1,8 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
 
-import { ContinuityResponse, ProofGenerationResult, ProofGenerator } from '..';
+import {
+  BatchContinuityResponse,
+  BatchProofGenerationResult,
+  ContinuityResponse,
+  ProofGenerationResult,
+  ProofGenerator,
+} from '..';
 
 const API_BASE_PATH = '/api/v1/proof-by-tx';
+const API_BATCH_BASE_PATH = '/api/v1/proof-batch-by-tx';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -25,6 +32,45 @@ class ApiClient {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Failed to fetch proof: ${error}`);
+      } else {
+        throw new Error(`Unexpected error: ${error}`);
+      }
+    }
+  }
+
+  async queryProofBatchFor(chainKey: number, transactionHashes: string[]): Promise<BatchContinuityResponse> {
+    try {
+      const res = await this.client.post(`${API_BATCH_BASE_PATH}/${chainKey}`, transactionHashes);
+      const data = res.data;
+
+      const merkleProofs = new Map(
+        Object.entries(data.merkleProofs).map(([headerNumber, proofsMap]: [string, any]) => [
+          Number(headerNumber),
+          new Map(
+            Object.entries(proofsMap).map(([txIndex, proofEntry]: [string, any]) => [
+              Number(txIndex),
+              {
+                txHash: proofEntry.txHash,
+                txBytes: proofEntry.txBytes,
+                merkleProof: proofEntry.merkleProof,
+              },
+            ]),
+          ),
+        ]),
+      );
+
+      return {
+        chainKey: data.chainKey,
+        fromHeader: data.fromHeader,
+        toHeader: data.toHeader,
+        continuityProof: data.continuityProof,
+        merkleProofs,
+        cached: data.cached,
+        generatedAt: new Date(data.generatedAt),
+      } as BatchContinuityResponse;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(`Failed to fetch batch proofs: ${error}`);
       } else {
         throw new Error(`Unexpected error: ${error}`);
       }
@@ -95,6 +141,80 @@ export class ProverAPIProofGenerator implements ProofGenerator {
       return { success: true, data: continuityProof };
     } catch (error) {
       return { success: false, error: `Failed to generate proof via API: ${error}` };
+    }
+  }
+
+  /**
+   * Generates proofs for a batch of transaction hashes by querying the remote proof API server.
+   *
+   * Transaction hashes should be provided as an array of hex strings, and should exist in the source chain for which the
+   * chainKey was specified during the generator construction.
+   *
+   * @param transactionHashes - An array of transaction hashes to generate proofs for, as hex strings.
+   * @returns A promise that resolves to an array of results for each proof generation
+   *
+   * @example
+   * ```typescript
+   * const chainKey = 2;
+   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+   * const batchProofResult = await apiProvider.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
+   * // Results in:
+   * // [
+   * //   {
+   * //     success: true,
+   * //     data: {
+   * //       chainKey: 2,
+   * //       fromHeader: 123456,
+   * //       toHeader: 123458,
+   * //       continuityProof: {
+   * //         lowerEndpointDigest: '0xdef...',
+   * //         roots: [ '0x789...', '0x321...', ..., '0x7a3...' ]
+   * //       },
+   * //       merkleProofs: {
+   * //         '123456': {
+   * //           '0': {
+   * //             txHash: '0xabc...',
+   * //             txBytes: '0x123...',
+   * //             merkleProof: {
+   * //               root: '0x789...',
+   * //               siblings: [ { hash: '0xabc...', isLeft: true }, ... ]
+   * //             }
+   * //           },
+   * //           '1': {
+   * //             txHash: '0xdef...',
+   * //             txBytes: '0x456...',
+   * //             merkleProof: {
+   * //               root: '0x321...',
+   * //               siblings: [ { hash: '0xd3f...', isLeft: true }, ... ]
+   * //             }
+   * //           }
+   * //         },
+   * //         '123458': {
+   * //           '0': {
+   * //             txHash: '0x789...',
+   * //             txBytes: '0x789...',
+   * //             merkleProof: {
+   * //               root: '0x7a3...',
+   * //               siblings: [ { hash: '0x5b2...', isLeft: true }, ... ]
+   * //             }
+   * //           }
+   * //         }
+   * //       },
+   * //       cached: false,
+   * //       generatedAt: '2024-01-01T00:00:00Z'
+   * //     }
+   * //   },
+   * // ]
+   * ```
+   */
+  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult> {
+    try {
+      const continuityProof = await this.client.queryProofBatchFor(this.chainKey, transactionHashes);
+
+      return { success: true, data: continuityProof };
+    } catch (error) {
+      return { success: false, error: `Failed to generate batch proof via API: ${error}` };
     }
   }
 }
