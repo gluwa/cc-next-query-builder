@@ -90,7 +90,7 @@ if (verificationResult) {
 
 // Verify multiple transactions with a shared continuity proof
 const batchResult = await prover.verifyBatch(
-  chainKey,
+  ,
   [height1, height2, height3],
   [txBytes1, txBytes2, txBytes3],
   [merkleProof1, merkleProof2, merkleProof3],
@@ -107,7 +107,7 @@ Here's an example showing how to use the proof generator components together:
 import { chainInfo, blockProver, proofGenerator } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
-const chainKey = 2;
+const chainKey = 1;
 
 // Setup Creditcoin components
 const creditcoinProvider = new JsonRpcProvider('https://rpc.usc-testnet2.creditcoin.network');
