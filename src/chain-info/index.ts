@@ -93,6 +93,7 @@ export interface ChainInfoProvider {
     targetHeight: number,
     pollIntervalMs?: number,
     waitTimeoutMs?: number,
+    extraDelayMs?: number,
   ): Promise<void>;
   getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult>;
   getCheckpointForHeight(chainKey: number, height: number): Promise<HashResult>;
@@ -382,6 +383,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    * @param targetHeight - The block height to wait for attestation
    * @param pollIntervalMs - How often to check for attestation (default: 5000ms)
    * @param waitTimeoutMs - Maximum time to wait before timing out (default: 60000ms)
+   * @param extraDelayMs - Additional delay after attestation is detected to ensure data availability (default: 15000ms)
    * @returns Promise that resolves when the target height is attested
    * @throws Error if the timeout is exceeded before the height is attested
    *
@@ -406,6 +408,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
     targetHeight: number,
     pollIntervalMs: number = 5000,
     waitTimeoutMs: number = 60000,
+    extraDelayMs: number = 15000,
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -419,6 +422,8 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
     while (true) {
       const heightHash = await backOff(() => this.getLatestAttestedHeightAndHash(chainKey), backOffOptions);
       if (heightHash.exists && heightHash.height >= targetHeight) {
+        await new Promise((resolve) => setTimeout(resolve, extraDelayMs));
+
         return;
       }
 
