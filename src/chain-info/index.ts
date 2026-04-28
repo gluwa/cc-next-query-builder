@@ -1,10 +1,23 @@
 import { Contract, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
 import { backOff, BackoffOptions } from 'exponential-backoff';
-import type { ApiPromise } from '@polkadot/api';
 
 import ChainInfoABI from './chain_info.json';
 
 const contractABI = ChainInfoABI as unknown as InterfaceAbi;
+
+/**
+ * An interface which supports 3 different substrate api calls without
+ * requiring us to add @polkadot/api as a dependency.
+ */
+interface SubstrateFinalityApi {
+  rpc: {
+    chain: {
+      getHeader: (hash?: unknown) => Promise<{ number: { toNumber: () => number } }>;
+
+      getFinalizedHead: () => Promise<unknown>;
+    };
+  };
+}
 
 /**
  * Continuity bounds structure
@@ -96,6 +109,13 @@ export interface ChainInfoProvider {
     waitTimeoutMs?: number,
     extraDelayMs?: number,
   ): Promise<void>;
+  waitUntilHeightAttestedAndFinalized(
+    chainKey: number,
+    targetHeight: number,
+    pollIntervalMs?: number,
+    waitTimeoutMs?: number,
+    extraDelayMs?: number,
+  ): Promise<void>;
   getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult>;
   getCheckpointForHeight(chainKey: number, height: number): Promise<HashResult>;
 }
@@ -115,14 +135,18 @@ export const CHAIN_INFO_PRECOMPILE_ADDRESS = '0x00000000000000000000000000000000
  */
 export class PrecompileChainInfoProvider implements ChainInfoProvider {
   private chainInfoContract: Contract;
-  private api?: ApiPromise;
+  private api?: SubstrateFinalityApi;
 
   /**
    * Creates a new PrecompileChainInfoProvider instance
    * @param rpc - The JSON-RPC API provider for blockchain communication
    * @param chainInfoPrecompile - The address of the ChainInfo precompile contract (defaults to standard address)
    */
-  constructor(rpc: JsonRpcApiProvider, chainInfoPrecompile: string = CHAIN_INFO_PRECOMPILE_ADDRESS, api?: ApiPromise) {
+  constructor(
+    rpc: JsonRpcApiProvider,
+    chainInfoPrecompile: string = CHAIN_INFO_PRECOMPILE_ADDRESS,
+    api?: SubstrateFinalityApi,
+  ) {
     this.chainInfoContract = new Contract(chainInfoPrecompile, contractABI, rpc);
     this.api = api;
   }
@@ -381,11 +405,13 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
   }
 
   /**
-   * Waits until a specific block height is attested on a chain
+   * Waits until a specific block height is attested on a chain. This function is mostly
+   * kept for backwards compatibility. Scripts should prefer to use
+   * `waitUntilHeightAttestedAndFinalized` to prevent errors when requesting proof generation.
    * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @param targetHeight - The block height to wait for attestation
    * @param pollIntervalMs - How often to check for attestation (default: 5000ms)
-   * @param waitTimeoutMs - Maximum time to wait before timing out (default: 60000ms)
+   * @param waitTimeoutMs - Maximum time to wait before timing out (default: 180000ms)
    * @param extraDelayMs - Additional delay after attestation is detected to ensure data availability (default: 15000ms)
    * @returns Promise that resolves when the target height is attested
    * @throws Error if the timeout is exceeded before the height is attested
@@ -442,42 +468,67 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
     }
   }
 
+  /**
+   * Waits until a specific block height is attested on a chain and the attestation
+   * is included in a finalized Creditcoin block.
+   *
+   * This method first waits for the target height to be attested (same behavior as
+   * `waitUntilHeightAttested`), then waits until the block in which the attestation
+   * was observed is finalized. This provides stronger guarantees that the attestation
+   * is irreversible and safe for downstream operations.
+   *
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @param targetHeight - The block height to wait for attestation and finalization
+   * @param pollIntervalMs - How often to check for attestation/finalization (default: 5000ms)
+   * @param waitTimeoutMs - Maximum time to wait before timing out (default: 180000ms)
+   * @returns Promise that resolves when the target height is attested and finalized
+   * @throws Error if the timeout is exceeded before the height is attested or finalized
+   *
+   * @example
+   * ```typescript
+   * const chainInfoProvider = new PrecompileChainInfoProvider(rpcProvider, undefined, api);
+   *
+   * const supportedChains = await chainInfoProvider.getSupportedChains();
+   * const chainKey = supportedChains[0].chainKey;
+   * const targetHeight = 10;
+   *
+   * // Wait until the target height is attested and finalized before proving
+   * await chainInfoProvider.waitUntilHeightAttestedAndFinalized(chainKey, targetHeight);
+   *
+   * // After the method resolves, transactions up to targetHeight are finalized
+   * // and can be safely proven with stronger guarantees than attestation alone.
+   * console.log(`Height ${targetHeight} is now attested and finalized on chain key ${chainKey}`);
+   * ```
+   */
   public async waitUntilHeightAttestedAndFinalized(
-  chainKey: number,
-  targetHeight: number,
-  pollIntervalMs: number = 5000,
-  waitTimeoutMs: number = 180000, // 3 minutes
-): Promise<void> {
-  const startTime = Date.now();
+    chainKey: number,
+    targetHeight: number,
+    pollIntervalMs: number = 5000,
+    waitTimeoutMs: number = 180000, // 3 minutes
+  ): Promise<void> {
+    const startTime = Date.now();
 
-  // Wait for attestation
-  await this.waitUntilHeightAttested(
-    chainKey,
-    targetHeight,
-    pollIntervalMs,
-    waitTimeoutMs,
-  );
+    // Wait for attestation
+    await this.waitUntilHeightAttested(chainKey, targetHeight, pollIntervalMs, waitTimeoutMs);
 
-  // Capture block at or above attestation block
-  const attestationObservedAtBlock = await this.getBlockNumber();
+    // Capture block at or above attestation block
+    const attestationObservedAtBlock = await this.getBlockNumber();
 
-  // Wait until attestation block is finalized
-  while (true) {
-    const finalizedBlock = await this.getFinalizedBlockNumber();
+    // Wait until attestation block is finalized
+    while (true) {
+      const finalizedBlock = await this.getFinalizedBlockNumber();
 
-    if (finalizedBlock >= attestationObservedAtBlock) {
-      return;
+      if (finalizedBlock >= attestationObservedAtBlock) {
+        return;
+      }
+
+      if (Date.now() - startTime > waitTimeoutMs) {
+        throw new Error(`Timeout waiting for height ${targetHeight} attestation to finalize`);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
-
-    if (Date.now() - startTime > waitTimeoutMs) {
-      throw new Error(
-        `Timeout waiting for height ${targetHeight} attestation to finalize`,
-      );
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
-}
 
   /**
    * Retrieves the attestation height for a specific block digest on a chain
