@@ -187,6 +187,15 @@ class MockContinuityProvider implements chainInfo.ChainInfoProvider {
     return;
   }
 
+  public async waitUntilHeightAttestedAndFinalized(
+    _chainKey: number,
+    _targetHeight: number,
+    _pollIntervalMs: number = 1000,
+    _waitTimeoutMs: number = 60000,
+  ): Promise<void> {
+    return;
+  }
+
   public async getAttestationHeightForDigest(_chainKey: number, _digest: string): Promise<chainInfo.HeightResult> {
     throw new Error('Method not implemented.');
   }
