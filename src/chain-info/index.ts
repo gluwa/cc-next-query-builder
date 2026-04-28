@@ -1,5 +1,6 @@
 import { Contract, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
 import { backOff, BackoffOptions } from 'exponential-backoff';
+import type { ApiPromise } from '@polkadot/api';
 
 import ChainInfoABI from './chain_info.json';
 
@@ -114,14 +115,16 @@ export const CHAIN_INFO_PRECOMPILE_ADDRESS = '0x00000000000000000000000000000000
  */
 export class PrecompileChainInfoProvider implements ChainInfoProvider {
   private chainInfoContract: Contract;
+  private api?: ApiPromise;
 
   /**
    * Creates a new PrecompileChainInfoProvider instance
    * @param rpc - The JSON-RPC API provider for blockchain communication
    * @param chainInfoPrecompile - The address of the ChainInfo precompile contract (defaults to standard address)
    */
-  constructor(rpc: JsonRpcApiProvider, chainInfoPrecompile: string = CHAIN_INFO_PRECOMPILE_ADDRESS) {
+  constructor(rpc: JsonRpcApiProvider, chainInfoPrecompile: string = CHAIN_INFO_PRECOMPILE_ADDRESS, api?: ApiPromise) {
     this.chainInfoContract = new Contract(chainInfoPrecompile, contractABI, rpc);
+    this.api = api;
   }
 
   /**
@@ -407,7 +410,7 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
     chainKey: number,
     targetHeight: number,
     pollIntervalMs: number = 5000,
-    waitTimeoutMs: number = 60000,
+    waitTimeoutMs: number = 180000, // 3 minutes
     extraDelayMs: number = 15000,
   ): Promise<void> {
     const startTime = Date.now();
@@ -438,6 +441,43 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
   }
+
+  public async waitUntilHeightAttestedAndFinalized(
+  chainKey: number,
+  targetHeight: number,
+  pollIntervalMs: number = 5000,
+  waitTimeoutMs: number = 180000, // 3 minutes
+): Promise<void> {
+  const startTime = Date.now();
+
+  // Wait for attestation
+  await this.waitUntilHeightAttested(
+    chainKey,
+    targetHeight,
+    pollIntervalMs,
+    waitTimeoutMs,
+  );
+
+  // Capture block at or above attestation block
+  const attestationObservedAtBlock = await this.getBlockNumber();
+
+  // Wait until attestation block is finalized
+  while (true) {
+    const finalizedBlock = await this.getFinalizedBlockNumber();
+
+    if (finalizedBlock >= attestationObservedAtBlock) {
+      return;
+    }
+
+    if (Date.now() - startTime > waitTimeoutMs) {
+      throw new Error(
+        `Timeout waiting for height ${targetHeight} attestation to finalize`,
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+}
 
   /**
    * Retrieves the attestation height for a specific block digest on a chain
@@ -531,5 +571,24 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
     } catch (error: any) {
       throw new Error(`Error calling contract method: ${error}`);
     }
+  }
+
+  private async getBlockNumber(): Promise<number> {
+    if (!this.api) {
+      throw new Error('getBlockNumber() requires a Substrate ApiPromise instance');
+    }
+
+    const header = await this.api.rpc.chain.getHeader();
+    return header.number.toNumber();
+  }
+
+  private async getFinalizedBlockNumber(): Promise<number> {
+    if (!this.api) {
+      throw new Error('getFinalized() requires a Substrate ApiPromise instance');
+    }
+
+    const finalizedHash = await this.api.rpc.chain.getFinalizedHead();
+    const header = await this.api.rpc.chain.getHeader(finalizedHash);
+    return header.number.toNumber();
   }
 }
