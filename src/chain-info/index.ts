@@ -297,10 +297,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
     try {
-      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(
-        chainKey,
-        { blockTag: 'finalized' },
-      );
+      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey, {
+        blockTag: 'finalized',
+      });
 
       // Validate bounds structure before casting
       if (!heightHash || typeof heightHash !== 'object') {
