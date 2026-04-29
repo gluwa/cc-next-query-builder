@@ -144,7 +144,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getSupportedChains(): Promise<ChainInfo[]> {
     try {
-      const chains = await this.chainInfoContract.get_supported_chains();
+      const chains = await this.chainInfoContract.get_supported_chains({
+        blockTag: 'finalized',
+      });
 
       // Validate contract output structure before casting
       if (!chains || typeof chains !== 'object') {
@@ -200,7 +202,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getSupportedChainByKey(chainKey: number): Promise<ChainInfo | null> {
     try {
-      const chainResult = await this.chainInfoContract.get_chain_by_key(chainKey);
+      const chainResult = await this.chainInfoContract.get_chain_by_key(chainKey, {
+        blockTag: 'finalized',
+      });
 
       // Validate contract output structure before casting
       if (!chainResult || typeof chainResult !== 'object') {
@@ -261,7 +265,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getAttestationGenesisHeight(chainKey: number): Promise<number> {
     try {
-      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(chainKey);
+      const genesisHeight = await this.chainInfoContract.get_attestation_genesis_height(chainKey, {
+        blockTag: 'finalized',
+      });
 
       // Validate output structure before returning
       if (typeof genesisHeight !== 'bigint') {
@@ -297,7 +303,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getLatestAttestedHeightAndHash(chainKey: number): Promise<HeightHash> {
     try {
-      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey);
+      const heightHash = await this.chainInfoContract.get_latest_attestation_height_and_hash(chainKey, {
+        blockTag: 'finalized',
+      });
 
       // Validate bounds structure before casting
       if (!heightHash || typeof heightHash !== 'object') {
@@ -350,7 +358,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getContinuityBounds(chainKey: number, height: number): Promise<ContinuityBounds> {
     try {
-      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height);
+      const bounds = await this.chainInfoContract.get_attestation_bounds(chainKey, height, {
+        blockTag: 'finalized',
+      });
 
       // Validate bounds structure before casting
       if (!bounds || typeof bounds !== 'object') {
@@ -464,7 +474,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getAttestationHeightForDigest(chainKey: number, digest: string): Promise<HeightResult> {
     try {
-      const heightResult = await this.chainInfoContract.get_attestation_height_for_digest(chainKey, digest);
+      const heightResult = await this.chainInfoContract.get_attestation_height_for_digest(chainKey, digest, {
+        blockTag: 'finalized',
+      });
 
       // Validate bounds structure before casting
       if (!heightResult || typeof heightResult !== 'object') {
@@ -511,7 +523,9 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
    */
   public async getCheckpointForHeight(chainKey: number, height: number): Promise<HashResult> {
     try {
-      const hashResult = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height);
+      const hashResult = await this.chainInfoContract.get_checkpoint_for_height(chainKey, height, {
+        blockTag: 'finalized',
+      });
 
       // Validate bounds structure before casting
       if (!hashResult || typeof hashResult !== 'object') {
