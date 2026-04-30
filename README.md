@@ -129,7 +129,7 @@ const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(
   chainKey,
   'https://proof-gen-api.usc-testnet2.creditcoin.network',
 );
-const proofResult = await apiProvider.generateProof(transactionHash);
+const proofResult = await apiProvider.generateProof(txHash);
 
 if (proofResult.success && proofResult.data) {
   const proofData = proofResult.data;
