@@ -1,0 +1,52 @@
+---
+name: examples
+
+'on':
+  pull_request:
+    paths:
+      - '**.ts'
+      - '**.js'
+      - '.github/workflows/examples.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install @gluwa/usc-sdk from source
+        run: |
+          npm install
+          npm run build
+          npm pack
+          npm install ./gluwa-usc-sdk-*.tgz
+
+      - name: Execute examples
+        env:
+          CREDITCOIN_RPC_URL: 'https://rpc.cc3-devnet.creditcoin.network'
+          # Sepolia Full Archive: 1 / Ethereum Mainnet Full Archive: 2
+          # both are attested to since genesis
+          SOURCE_CHAIN_KEY: 1
+          # from Apr 30, 2026
+          SOURCE_CHAIN_BLOCK_HEIGHT: 10760862
+        run: |
+          for example in examples/*.ts; do
+            echo "INFO: will execute $example"
+
+            npx ts-node $example
+
+            echo "DONE: executing $example"
+          done
