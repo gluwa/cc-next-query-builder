@@ -41,7 +41,7 @@ jobs:
         uses: i3h/download-release-asset@v1
         with:
           owner: gluwa
-          repo: creditcoin3-next
+          repo: creditcoin3
           tag: ${{ needs.setup.outputs.release_tag }}
           file: ${{ matrix.artifact }}
           path: canonical/
