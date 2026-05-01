@@ -18,10 +18,14 @@ You have to define these values before executing them:
 
 - `CREDITCOIN_RPC_URL` - string - the URL to the Creditcoin chain,
   for example `https://rpc.cc3-devnet.creditcoin.network`
+- `CREDITCOIN_PROOF_GEN_URL` - string - the URL to the Creditcoin Proof Generator API,
+  for example `https://proof-gen-api.cc3-devnet.creditcoin.network/`
 - `SOURCE_CHAIN_KEY` - number - unique identifier of the source chain, e.g. Ethereum,
   on the Creditcoin chain. NOTE: this is different than `chainId`!
 - `SOURCE_CHAIN_BLOCK_HEIGHT` - number - the block height on the source chain, e.g. Ethereum,
   you are trying to inspect
+- `SOURCE_CHAIN_TXN_HASH` - string - a transaction hash on the source chain, e.g. Ethereum,
+  you are trying to generate a proof for
 
 ## Transaction verification
 
@@ -38,23 +42,11 @@ state of cross-chain attestations. See
 
 ### Proof generation
 
-The `ProverAPIProofGenerator` provides a convenient way to generate proofs by communicating with remote proof generation API servers. This component handles HTTP communication and provides a clean interface for fetching pre-computed proofs.
-
-```js
-import { proofGenerator } from '@gluwa/usc-sdk';
-
-const chainKey = 2; // Example supported chain key
-const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-
-const proofResult = await apiProvider.generateProof(transactionHash);
-if (proofResult.success) {
-  // Use the proof data
-  console.log('Proof generated successfully:', proofResult.data);
-} else {
-  console.error('Proof generation failed:', proofResult.error);
-}
-```
+The `ProverAPIProofGenerator` provides a convenient way to generate proofs by
+communicating with remote proof generation API servers. This component handles
+HTTP communication and provides a clean interface for fetching pre-computed proofs.
+See
+[examples/proof-generation.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/proof-generation.ts).
 
 ### Proof validation
 
