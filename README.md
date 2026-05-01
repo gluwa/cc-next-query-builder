@@ -13,6 +13,16 @@ or with yarn
 yarn add @gluwa/usc-sdk
 ```
 
+**IMPORTANT:** all examples receive their input from environment variables.
+You have to define these values before executing them:
+
+- `CREDITCOIN_RPC_URL` - string - the URL to the Creditcoin chain,
+  for example `https://rpc.cc3-devnet.creditcoin.network`
+- `SOURCE_CHAIN_KEY` - number - unique identifier of the source chain, e.g. Ethereum,
+  on the Creditcoin chain. NOTE: this is different than `chainId`!
+- `SOURCE_CHAIN_BLOCK_HEIGHT` - number - the block height on the source chain, e.g. Ethereum,
+  you are trying to inspect
+
 ## Transaction verification
 
 For verifying transaction inclusion the library has a series of components used to generate and validate inclusion proofs along with helper tools for tracking supported source
@@ -20,26 +30,11 @@ chains from which transactions can be proven along with helpers for keeping trac
 
 ### Supported chains and attestation information
 
-The `PrecompileChainInfoProvider` interacts with Creditcoin's ChainInfo precompile contract to retrieve information about supported chains, attestation data, and continuity bounds. This component is essential for understanding the current state of cross-chain attestations.
-
-```js
-import { chainInfo } from '@gluwa/usc-sdk';
-import { JsonRpcProvider } from 'ethers';
-
-const provider = new JsonRpcProvider('https://rpc.usc-testnet2.creditcoin.network');
-const chainInfoProvider = new chainInfo.PrecompileChainInfoProvider(provider);
-
-// Get supported chains
-const supportedChains = await chainInfoProvider.getSupportedChains();
-console.log('Supported chains:', supportedChains);
-
-// Get continuity bounds for a specific block
-const bounds = await chainInfoProvider.getContinuityBounds(chainKey, blockHeight);
-console.log('Continuity bounds:', bounds);
-
-// Wait for a block to be attested
-await chainInfoProvider.waitUntilHeightAttested(chainKey, targetHeight);
-```
+The `PrecompileChainInfoProvider` interacts with Creditcoin's ChainInfo precompile
+contract to retrieve information about supported chains, attestation data, and
+continuity bounds. This component is essential for understanding the current
+state of cross-chain attestations. See
+[examples/supported-chains-attestation-information.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/supported-chains-attestation-information.ts).
 
 ### Proof generation
 
