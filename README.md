@@ -50,41 +50,10 @@ See
 
 ### Proof validation
 
-The `PrecompileBlockProver` provides on-chain verification capabilities for transaction proofs. It can verify both single transactions and batches of transactions using Merkle proofs and continuity proofs.
-
-```js
-import { blockProver } from '@gluwa/usc-sdk';
-import { JsonRpcProvider } from 'ethers';
-
-const provider = new JsonRpcProvider('https://rpc.usc-testnet2.creditcoin.network');
-const prover = new blockProver.PrecompileBlockProver(provider);
-
-// Verify a single transaction proof
-const verificationResult = await prover.verifySingle(
-  chainKey,
-  blockHeight,
-  encodedTransactionBytes,
-  merkleProof,
-  continuityProof,
-  true, // emit event on successful verification
-);
-
-if (verificationResult) {
-  console.log('Transaction proof verified successfully');
-} else {
-  console.log('Transaction proof verification failed');
-}
-
-// Verify multiple transactions with a shared continuity proof
-const batchResult = await prover.verifyBatch(
-  ,
-  [height1, height2, height3],
-  [txBytes1, txBytes2, txBytes3],
-  [merkleProof1, merkleProof2, merkleProof3],
-  sharedContinuityProof,
-  true,
-);
-```
+The `PrecompileBlockProver` provides on-chain verification capabilities for
+transaction proofs. It can verify both single transactions and batches of
+transactions using Merkle proofs and continuity proofs. See
+[examples/proof-validation.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/proof-validation.ts).
 
 ### Complete end to end example
 
