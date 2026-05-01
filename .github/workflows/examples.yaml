@@ -37,11 +37,14 @@ jobs:
       - name: Execute examples
         env:
           CREDITCOIN_RPC_URL: 'https://rpc.cc3-devnet.creditcoin.network'
+          CREDITCOIN_PROOF_GEN_URL: 'https://prover.cc3-devnet.creditcoin.network/'
           # Sepolia Full Archive: 1 / Ethereum Mainnet Full Archive: 2
           # both are attested to since genesis
           SOURCE_CHAIN_KEY: 1
           # from Apr 30, 2026
           SOURCE_CHAIN_BLOCK_HEIGHT: 10760862
+          # txn from the block above, sends 0.004 ETH
+          SOURCE_CHAIN_TXN_HASH: '0xba956ac665d7c36bab907d0a3c8a7f977132ac8717f02c1a8056aa0d24505ae5'
         run: |
           for example in examples/*.ts; do
             echo "INFO: will execute $example"
