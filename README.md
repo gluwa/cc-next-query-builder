@@ -55,6 +55,14 @@ transaction proofs. It can verify both single transactions and batches of
 transactions using Merkle proofs and continuity proofs. See
 [examples/proof-validation.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/proof-validation.ts).
 
+### Batch proof generation and validation
+
+When working with multiple transactions at the same time you can use
+`ProverAPIProofGenerator.generateBatchProof()` and
+`PrecompileBlockProver.verifyBatch()` to generate and verify batch proofs
+instead of iterating over each transaction one at a time. See
+[examples/batch-proof-validation.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/batch-proof-validation.ts).
+
 ### Complete end to end example
 
 Here's an example showing how to use the proof generator components together:
