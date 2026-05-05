@@ -66,51 +66,8 @@ instead of iterating over each transaction one at a time. See
 ### Complete end to end example
 
 Here's an example showing how to use the proof generator components together:
+[examples/end-to-end.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/end-to-end.ts).
 
-```js
-import { chainInfo, blockProver, proofGenerator } from '@gluwa/usc-sdk';
-import { JsonRpcProvider } from 'ethers';
-
-const chainKey = 1;
-
-// Setup Creditcoin components
-const creditcoinProvider = new JsonRpcProvider('https://rpc.usc-testnet2.creditcoin.network');
-const chainInfoProvider = new chainInfo.PrecompileChainInfoProvider(creditcoinProvider);
-const prover = new blockProver.PrecompileBlockProver(creditcoinProvider);
-
-// Generate proof via API
-
-const sourceChainProvider = new JsonRpcProvider('https://sepolia.infura.io/v3/<api_key>');
-const txHash = '0x6fe777442b70a5511f3c443176ae860e50445bd93b663711717996a70c5022ab'; // Example transaction hash
-const txHeight = await sourceChainProvider.getTransaction(txHash).then((tx) => tx?.blockNumber);
-
-// Before generating a proof we have to wait for the block containing the transaction
-// we want to prove, to be attested on the creditcoin chain
-await chainInfoProvider.waitUntilHeightAttested(chainKey, txHeight);
-
-// Once the block is attested we can request the proof from the API server
-const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(
-  chainKey,
-  'https://proof-gen-api.usc-testnet2.creditcoin.network',
-);
-const proofResult = await apiProvider.generateProof(txHash);
-
-if (proofResult.success && proofResult.data) {
-  const proofData = proofResult.data;
-
-  // Verify the proof on-chain
-  const verificationResult = await prover.verifySingle(
-    proofData.chainKey,
-    proofData.headerNumber,
-    proofData.txBytes,
-    proofData.merkleProof,
-    proofData.continuityProof,
-    true,
-  );
-
-  console.log('Proof verification:', verificationResult ? 'SUCCESS' : 'FAILED');
-}
-```
 
 ## Query Builder
 
