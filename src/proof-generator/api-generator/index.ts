@@ -246,6 +246,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * @param targetHeight - The block height to wait for
    * @param pollIntervalMs - Interval between polling attempts (default: 15 seconds)
    * @param waitTimeoutMs - Maximum time to wait before timing out (default: 15 minutes)
+   * @param extraDelayMs - Extra wait time to ensure consistency in case we request the proof from a different proof gen server due to load balancing
    *
    * @returns A Promise that resolves once the target height is attested and available
    *
@@ -276,6 +277,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
     targetHeight: number,
     pollIntervalMs: number = 15000,
     waitTimeoutMs: number = 900000, // 15 minutes
+    extraDelayMs: number = 5000, 
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -288,6 +290,8 @@ export class ProverAPIProofGenerator implements ProofGenerator {
       if (latestAttestedHeight == null) {
         console.warn(`⚠️ No attested height in prover cache for chain key ${chainKey}. Retrying...`);
       } else if (latestAttestedHeight >= targetHeight) {
+        // Add delay in case of inconsistency between proof gen servers
+        await new Promise((resolve) => setTimeout(resolve, extraDelayMs));
         return;
       } else {
         console.debug(
