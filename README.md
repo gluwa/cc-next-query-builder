@@ -68,7 +68,6 @@ instead of iterating over each transaction one at a time. See
 Here's an example showing how to use the proof generator components together:
 [examples/end-to-end.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/end-to-end.ts).
 
-
 ## Query Builder
 
 The `QueryBuilder` is used to extract result segments from transactions which can be used to validate their contents. To use it follow the example below:
