@@ -10,6 +10,7 @@ import {
 
 const API_BASE_PATH = '/api/v1/proof-by-tx';
 const API_BATCH_BASE_PATH = '/api/v1/proof-batch-by-tx';
+const API_ATTESTED_HEIGHT_PATH = '/api/v1/attested-height';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -71,6 +72,19 @@ class ApiClient {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Failed to fetch batch proofs: ${error}`);
+      } else {
+        throw new Error(`Unexpected error: ${error}`);
+      }
+    }
+  }
+
+  async queryAttestedHeight(chainKey: number): Promise<number | undefined> {
+    try {
+      const res = await this.client.get(`${API_ATTESTED_HEIGHT_PATH}/${chainKey}`);
+      return res.data.attestedHeight;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(`Failed to fetch attested height: ${error}`);
       } else {
         throw new Error(`Unexpected error: ${error}`);
       }
@@ -215,6 +229,77 @@ export class ProverAPIProofGenerator implements ProofGenerator {
       return { success: true, data: continuityProof };
     } catch (error) {
       return { success: false, error: `Failed to generate batch proof via API: ${error}` };
+    }
+  }
+
+  /**
+   * Waits until a specific block height is attested *and available in the proof generation server*.
+   *
+   * This method polls the proof-gen API (`/api/v1/attested-height/{chainKey}`) until the
+   * requested `targetHeight` has been attested and ingested into the server’s in-memory cache.
+   *
+   * ⚠️ This should be called before submitting proof requests. Attempting to generate a proof
+   * for a block that has not yet been attested (or fully indexed by the server) may result in
+   * failures or retriable errors.
+   *
+   * @param chainKey - The unique identifier for the source chain on the Creditcoin network
+   * @param targetHeight - The block height to wait for
+   * @param pollIntervalMs - Interval between polling attempts (default: 15 seconds)
+   * @param waitTimeoutMs - Maximum time to wait before timing out (default: 15 minutes)
+   * @param extraDelayMs - Extra wait time to ensure consistency in case we request the proof from a different proof gen server due to load balancing
+   *
+   * @returns A Promise that resolves once the target height is attested and available
+   *
+   * @throws Error if the timeout is exceeded before the height becomes available
+   *
+   * @example
+   * ```typescript
+   * const chainKey = 11;
+   * const targetHeight = 10_000;
+   *
+   * const prover = new ProverAPIProofGenerator(chainKey, apiUrl);
+   *
+   * // Wait until the proof-gen server is ready to serve proofs at this height
+   * await prover.waitUntilHeightAttested(chainKey, targetHeight);
+   *
+   * // Safe to request proofs at or below targetHeight
+   * const proof = await prover.generateProof(txHash);
+   * ```
+   *
+   * @remarks
+   * - This method relies on the proof-gen server’s internal attestation cache,
+   *   not directly on-chain data or precompiles.
+   * - There may be a delay between on-chain finalization and availability via this API.
+   * - The polling interval and timeout should be tuned based on expected network conditions.
+   */
+  public async waitUntilHeightAttested(
+    chainKey: number,
+    targetHeight: number,
+    pollIntervalMs: number = 15000,
+    waitTimeoutMs: number = 900000, // 15 minutes
+    extraDelayMs: number = 5000, 
+  ): Promise<void> {
+    const startTime = Date.now();
+
+    while (true) {
+      if (Date.now() - startTime > waitTimeoutMs) {
+        throw new Error(`Timeout waiting for height ${targetHeight} to be attested on chain key ${chainKey}`);
+      }
+
+      const latestAttestedHeight = await this.client.queryAttestedHeight(chainKey);
+      if (latestAttestedHeight == null) {
+        console.warn(`⚠️ No attested height in prover cache for chain key ${chainKey}. Retrying...`);
+      } else if (latestAttestedHeight >= targetHeight) {
+        // Add delay in case of inconsistency between proof gen servers
+        await new Promise((resolve) => setTimeout(resolve, extraDelayMs));
+        return;
+      } else {
+        console.debug(
+          `Height ${targetHeight} not yet attested and in proof server cache for chain key ${chainKey}. Latest height: ${latestAttestedHeight}. Retrying in ${pollIntervalMs}ms...`,
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
   }
 }

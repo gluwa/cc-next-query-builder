@@ -388,7 +388,12 @@ export class PrecompileChainInfoProvider implements ChainInfoProvider {
   }
 
   /**
-   * Waits until a specific block height is attested on a chain
+   * This is a legacy implementation! Left unchanged to avoid impacting 
+   * existing users. For determining when to submit a proving request 
+   * at a particular height, use the implementation of 
+   * `waitUntilHeightAttested` in src/proof-generator/api-generator/index.ts
+   * 
+   * Waits until a specific block height is attested on a chain. 
    * @param chainKey - The unique identifier for the source chain on the creditcoin network
    * @param targetHeight - The block height to wait for attestation
    * @param pollIntervalMs - How often to check for attestation (default: 5000ms)
