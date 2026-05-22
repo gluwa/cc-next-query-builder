@@ -32,7 +32,7 @@ async function decodeBlocks(creditcoinUrl: string, decoderLibraryAddress: string
   console.log(`INFO: found ${numFiles} transactions to decode`);
 
   if (numFiles === 0) {
-     throw new Error('0 files found to decode. Something is wrong. Please investigate');
+    throw new Error('0 files found to decode. Something is wrong. Please investigate');
   }
 
   for (const [idx, txFile] of txnFiles.entries()) {
