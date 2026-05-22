@@ -277,7 +277,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
     targetHeight: number,
     pollIntervalMs: number = 15000,
     waitTimeoutMs: number = 900000, // 15 minutes
-    extraDelayMs: number = 5000, 
+    extraDelayMs: number = 5000,
   ): Promise<void> {
     const startTime = Date.now();
 

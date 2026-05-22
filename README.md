@@ -19,7 +19,7 @@ You have to define these values before executing them:
 - `CREDITCOIN_RPC_URL` - string - the URL to the Creditcoin chain,
   for example `https://rpc.cc3-devnet.creditcoin.network`
 - `CREDITCOIN_PROOF_GEN_URL` - string - the URL to the Creditcoin Proof Generator API,
-  for example `https://proof-gen-api.cc3-devnet.creditcoin.network/`
+  for example `https://prover.cc3-devnet.creditcoin.network/`
 - `SOURCE_CHAIN_KEY` - number - unique identifier of the source chain, e.g. Ethereum,
   on the Creditcoin chain. NOTE: this is different than `chainId`!
 - `SOURCE_CHAIN_BLOCK_HEIGHT` - number - the block height on the source chain, e.g. Ethereum,
@@ -70,154 +70,19 @@ Here's an example showing how to use the proof generator components together:
 
 ## Query Builder
 
-The `QueryBuilder` is used to extract result segments from transactions which can be used to validate their contents. To use it follow the example below:
+The `QueryBuilder` is used to extract result segments from transactions which
+can be used to validate their contents. See
+[tests/smoke/query.builder.test.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/tests/smoke/query.builder.test.ts)
+for more context.
 
-Get the ethers transaction and transaction receipt objects for the transaction from which you want to compose the query.
+The `Query Builder should be able to build a query` and `Build query from transactions with multiple events`
+test scenarios - show how to:
 
-```js
-import { queryBuilder, encoding } from '@gluwa/usc-sdk';
-import { JsonRpcProvider } from 'ethers';
-
-const provider = new JsonRpcProvider('https://sepolia.infura.io/v3/<api_key>');
-const transactionHash = '0x6fe777442b70a5511f3c443176ae860e50445bd93b663711717996a70c5022ab';
-const transaction = await provider.getTransaction(transactionHash);
-const receipt = await provider.getTransactionReceipt(transactionHash);
-const encoding = encoding.EncodingVersion.V1;
-const builder = queryBuilder.QueryBuilder.createFromTransaction(transaction!, receipt!, encoding);
-```
-
-### Setting an ABI provider to decode the calldata and events
-
-Contract-specific fields like calldata and events require the ABI from the respective contracts in order for the query builder to understand the context of the data. The ABI provider that the query builder needs is essentially a function that receives the contract address and outputs the ABI of that contract address.
-
-```js
-builder.setAbiProvider(async (contractAddress: string) => {
-  return JSON.stringify(erc20Abi);
-});
-```
-
-### Building the query
-
-Depending on what your Universal Smart Contract on USC testnet requires, you can configure your query builder to add fields from the transaction where the available fields are
-
-```js
-export enum QueryableFields {
-  Type = 'type',
-  TxChainId = 'chainId',
-  TxNonce = 'nonce',
-  TxGasPrice = 'gasPrice',
-  TxGasLimit = 'gasLimit',
-  TxFrom = 'from',
-  TxTo = 'to',
-  TxValue = 'value',
-  TxData = 'data',
-  TxV = 'v',
-  TxR = 'r',
-  TxS = 's',
-  TxYParity = 'yParity',
-  TxAccessList = 'accessList',
-  TxMaxPriorityFeePerGas = 'maxPriorityFeePerGas',
-  TxMaxFeePerGas = 'maxFeePerGas',
-  TxMaxFeePerBlobGas = 'maxFeePerBlobGas',
-  TxBlobVersionedHashes = 'blobVersionedHashes',
-  RxStatus = 'rxStatus',
-  RxGasUsed = 'rxGasUsed',
-  RxLogBlooms = 'rxLogBlooms',
-  RxLogs = 'rxLogs',
-}
-```
-
-Example
-
-```js
-builder
-  .addStaticField(QueryableFields.RxStatus)
-  .addStaticField(QueryableFields.TxFrom)
-  .addStaticField(QueryableFields.TxTo);
-```
-
-To add calldata-specific fields, you'll need to use the query builder's add function argument. Please make sure that the contract's address for the calldata is available in the abi provider you've set for the query builder.
-Example, we want to include the to and value of a ERC20 transfer calldata
-
-```js
-builder.setAbiProvider(async (contractAddress) => {
-  return `[
-    {
-      'constant': false,
-      'inputs': [
-          {
-              'name': 'to',
-              'type': 'address'
-          },
-          {
-              'name': 'value',
-              'type': 'uint256'
-          }
-      ],
-      'name': 'transfer',
-      'outputs': [
-          {
-              'name': '',
-              'type': 'bool'
-          }
-      ],
-      'payable': false,
-      'stateMutability': 'nonpayable',
-      'type': 'function'
-    }
-  ]`;
-});
-
-builder.addFunctionSignature();
-await builder.addFunctionArgument('Transfer', 'to');
-await builder.addFunctionArgument('Transfer', 'value');
-```
-
-To add event-specific fields, you'll need to use the query builder's eventBuilder.
-Please make sure that the contract's address from where the event was emitted is available in the abi provider you've set for the query builder.
-Example, we want to build a query for an ERC20 Transfer event
-
-```js
-import {Log, LogDescription} from 'ethers';
-
-builder.setAbiProvider(async (contractAddress) => {
-  return `[
-    {
-      'anonymous': false,
-      'inputs': [
-          {
-              'indexed': true,
-              'name': 'from',
-              'type': 'address'
-          },
-          {
-              'indexed': true,
-              'name': 'to',
-              'type': 'address'
-          },
-          {
-              'indexed': false,
-              'name': 'value',
-              'type': 'uint256'
-          }
-      ],
-      'name': 'Transfer',
-      'type': 'event'
-    }
-  ]`;
-})
-// This is optional that you can further filter for events you're interested in
-// If you don't want to filter, just provide a function that only returns true
-const burnTransferFilter = (log: Log, logDescription: LogDescription, _: number) => {
-  if (logDescription.topic != '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef')
-      return false;
-
-  if (log.address.toLowerCase() != '0x47C30768E4c153B40d55b90F58472bb2291971e6'.toLowerCase())
-      return false;
-
-  return logDescription.args.from.toLowerCase() == '0x9d6bC9763008AD1F7619a3498EfFE9Ec671b276D'.toLowerCase() && logDescription.args.to.toLowerCase() == ZeroAddress.toLowerCase();
-};
-await builder.eventBuilder('Transfer', burnTransferFilter, b => b
-  .addSignature().addArgument('from').addArgument('to').addArgument('value')
-);
-```
+- Create a query builder
+- Use `.setAbiProvider()` to specify a ABI for a smart contract(s) to decode various calldata and events
+  related to the contract
+- Use `.addStaticField()` to query specific fields from the transaction, e.g. `TxFrom`, `TxTo`, `RxStatus`
+- Use `.eventBuilder()` to query for specific events and fields inside these events
+- Use `.addFunctionSignature()` and `.addFunctionArgument()` to query for specific arguments
+  passed as calldata
+- Call `.build()` to build the query and return the result segments fields which can be interrogated later
