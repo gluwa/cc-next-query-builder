@@ -118,7 +118,7 @@ jobs:
         timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         run: |
           node dist/bin/encode-blocks.js \
-            wss://blockchain.googleapis.com/v1/projects/usc-integration-test/locations/asia-east1/endpoints/ethereum-sepolia/rpc?key=${{ secrets.GOOGLE_SEPOLIA_RPC_KEY }} \
+            wss://sepolia.infura.io/ws/v3/${{ secrets.INFURA_SEPOLIA_RPC_KEY }} \
             /var/tmp/encoded-data/ethers/
         env:
           TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
