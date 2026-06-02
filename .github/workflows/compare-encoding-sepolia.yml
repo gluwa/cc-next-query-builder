@@ -1,5 +1,5 @@
 ---
-name: compare-encoding
+name: compare-encoding-sepolia
 
 'on':
   pull_request:
