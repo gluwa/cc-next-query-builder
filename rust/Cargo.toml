@@ -23,7 +23,7 @@ tokio = { version = "1.52.1", features = [
 futures-util = "0.3.32"
 alloy = { version = "0.11", features = ["provider-ws", "pubsub"] }
 hex = "0.4.3"
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 
 # Creditcoin
 usc-abi-encoding = { version = "0.5.0" }
