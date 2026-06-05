@@ -1,4 +1,5 @@
 use alloy::{
+    eips::BlockNumberOrTag,
     primitives::B256,
     providers::{Provider, ProviderBuilder, WsConnect},
     rpc::types::{BlockTransactionsKind, TransactionReceipt},
@@ -73,7 +74,7 @@ async fn block_handler(
     block_number: u64,
     path_to_store_json: String,
 ) -> Result<()> {
-    println!("new block --- {:?}", block_number);
+    println!("new finalized --- {:?}", block_number);
 
     fs::create_dir_all(format!("{}/{}", path_to_store_json, block_number))?;
 
@@ -164,22 +165,49 @@ async fn main() -> Result<()> {
         .on_ws(WsConnect::new(args.eth_rpc_url))
         .await?;
 
+    // Listen only to finalized blocks. The standard JSON-RPC pubsub interface
+    // does not expose a finalized subscription, so we use the new-head stream
+    // purely as a trigger and pull the latest finalized block on each tick,
+    // processing any blocks that finalized since the last run.
     let subscriber = provider.subscribe_blocks().await?;
     let mut stream = subscriber.into_stream();
-    while let Some(block) = stream.next().await {
-        let _ = block_handler(
-            provider.clone(),
-            block.number,
-            args.path_to_store_json.clone(),
-        )
-        .await;
+    let mut last_finalized: Option<u64> = None;
+    while stream.next().await.is_some() {
+        let finalized = provider
+            .get_block_by_number(BlockNumberOrTag::Finalized, BlockTransactionsKind::Hashes)
+            .await?;
+        let Some(finalized) = finalized else {
+            continue;
+        };
+        let finalized_number = finalized.header.number;
+
+        let from = match last_finalized {
+            Some(prev) if prev >= finalized_number => {
+                // No new finalized blocks since the last tick.
+                let current = start.elapsed()?;
+                if current.as_secs() >= timeout_minutes * 60 {
+                    println!("=== {timeout_minutes:?} mins timeout reached. exiting ...");
+                    break;
+                }
+                continue;
+            }
+            Some(prev) => prev + 1,
+            None => finalized_number,
+        };
+
+        for block_number in from..=finalized_number {
+            let _ = block_handler(
+                provider.clone(),
+                block_number,
+                args.path_to_store_json.clone(),
+            )
+            .await;
+        }
+        last_finalized = Some(finalized_number);
 
         let current = start.elapsed()?;
         if current.as_secs() >= timeout_minutes * 60 {
-            println!(
-                "=== {:?} mins timeout reached. exiting ...",
-                timeout_minutes
-            );
+            println!("=== {timeout_minutes:?} mins timeout reached. exiting ...");
             break;
         }
     }
