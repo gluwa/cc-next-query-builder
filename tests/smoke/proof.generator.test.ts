@@ -439,7 +439,7 @@ test.skip('E2E ProofGenerator integration test', async () => {
   // Then we test with the proof generator API server
   const apiServerUrl = 'http://localhost:3100';
   const requestTimeout = 5000; // 5 seconds
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl, requestTimeout);
+  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl, requestTimeout);
   const apiProofResult_1 = await apiProvider.generateProof(txHash1);
   expect(apiProofResult_1.success).toBe(true);
 

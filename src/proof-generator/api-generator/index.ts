@@ -1,12 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-import {
-  BatchContinuityResponse,
-  BatchProofGenerationResult,
-  ContinuityResponse,
-  ProofGenerationResult,
-  ProofGenerator,
-} from '..';
+import { BatchContinuityResponse, BatchProofResult, ContinuityResponse, ProofResult, ProofProvider } from '..';
 
 const API_BASE_PATH = '/api/v1/proof-by-tx';
 const API_BATCH_BASE_PATH = '/api/v1/proof-batch-by-tx';
@@ -100,14 +94,14 @@ class ApiClient {
  * Server is expected to expose an endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
  *
  */
-export class ProverAPIProofGenerator implements ProofGenerator {
+export class ProofBuilder implements ProofProvider {
   private client: ApiClient;
 
   private chainKey: number;
 
-  constructor(chainKey: number, apiServerUrl: string, timeout: number = 5000) {
+  constructor(chainKey: number, builderUrl: string, timeout: number = 5000) {
     this.chainKey = chainKey;
-    this.client = new ApiClient(apiServerUrl, timeout);
+    this.client = new ApiClient(builderUrl, timeout);
   }
 
   /**
@@ -123,9 +117,9 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const proofBuilder = new proof.api.ProofBuilder(chainKey, builderUrl);
+   * const proofResult = await proofBuilder.generateProof(transactionHash);
    * // Results in:
    * // {
    * //   success: true,
@@ -148,7 +142,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * // }
    * ```
    */
-  public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
+  public async generateProof(transactionHash: string): Promise<ProofResult> {
     try {
       const continuityProof = await this.client.queryProofFor(this.chainKey, transactionHash);
 
@@ -170,9 +164,9 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * @example
    * ```typescript
    * const chainKey = 2;
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const batchProofResult = await apiProvider.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
+   * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const proofBuilder = new proof.api.ProofBuilder(chainKey, builderUrl);
+   * const batchProofResult = await proofBuilder.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
    * // Results in:
    * // [
    * //   {
@@ -222,7 +216,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * // ]
    * ```
    */
-  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult> {
+  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
     try {
       const continuityProof = await this.client.queryProofBatchFor(this.chainKey, transactionHashes);
 
@@ -233,9 +227,9 @@ export class ProverAPIProofGenerator implements ProofGenerator {
   }
 
   /**
-   * Waits until a specific block height is attested *and available in the proof generation server*.
+   * Waits until a specific block height is attested *and available in the proof builder*.
    *
-   * This method polls the proof-gen API (`/api/v1/attested-height/{chainKey}`) until the
+   * This method polls the proof builder (`/api/v1/attested-height/{chainKey}`) until the
    * requested `targetHeight` has been attested and ingested into the server’s in-memory cache.
    *
    * ⚠️ This should be called before submitting proof requests. Attempting to generate a proof
@@ -257,13 +251,13 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * const chainKey = 11;
    * const targetHeight = 10_000;
    *
-   * const prover = new ProverAPIProofGenerator(chainKey, apiUrl);
+   * const proofBuilder = new proof.api.ProofBuilder(chainKey, apiUrl);
    *
    * // Wait until the proof-gen server is ready to serve proofs at this height
-   * await prover.waitUntilHeightAttested(chainKey, targetHeight);
+   * await proofBuilder.waitUntilHeightAttested(chainKey, targetHeight);
    *
    * // Safe to request proofs at or below targetHeight
-   * const proof = await prover.generateProof(txHash);
+   * const proof = await proofBuilder.generateProof(txHash);
    * ```
    *
    * @remarks

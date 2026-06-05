@@ -1,4 +1,4 @@
-import { BatchMerkleProofEntry, BatchProofGenerationResult, ProofGenerationResult, ProofGenerator } from '..';
+import { BatchMerkleProofEntry, BatchProofResult, ProofResult, ProofProvider } from '..';
 import { ChainInfoProvider } from '../../chain-info';
 
 import { abiEncode, EncodingVersion } from '../../encoding';
@@ -28,7 +28,7 @@ interface MerkleProofGenerationResult {
  *
  * The generator constructs Merkle proofs for transactions and continuity proofs for blocks.
  */
-export class RawProofGenerator implements ProofGenerator {
+export class RawProofGenerator implements ProofProvider {
   private blockProvider: BlockProvider;
   private chainInfoProvider: ChainInfoProvider;
 
@@ -117,7 +117,7 @@ export class RawProofGenerator implements ProofGenerator {
     };
   }
 
-  public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
+  public async generateProof(transactionHash: string): Promise<ProofResult> {
     const merkleProofResult = await this.generateMerkleProofFor(transactionHash);
 
     if (!merkleProofResult.success) {
@@ -146,7 +146,7 @@ export class RawProofGenerator implements ProofGenerator {
     }
   }
 
-  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult> {
+  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
     if (transactionHashes.length === 0) {
       return { success: false, error: 'No transaction hashes provided for batch proof generation' };
     }

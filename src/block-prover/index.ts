@@ -64,8 +64,8 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @example
    * ```typescript
    * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * const proofBuilder = new proof.api.ProofBuilder(chainKey, apiServerUrl);
+   * const proofResult = await proofBuilder.generateProof(transactionHash);
    * expect(proofResult.success).toBe(true);
    *
    * // Proof generation was successful, extract data and compute transaction index
@@ -101,8 +101,8 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * ```typescript
    * const chainKey = 2; // Example chain key
    * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * const proofBuilder = new proof.api.ProofBuilder(chainKey, apiServerUrl);
+   * const proofResult = await proofBuilder.generateProof(transactionHash);
    * expect(proofResult.success).toBe(true);
    *
    * // Proof generation was successful, extract data and verify on-chain
@@ -148,13 +148,13 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * ```typescript
    * const chainKey = 2; // Example chain key
    * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+   * const proofBuilder = new proof.api.ProofBuilder(chainKey, apiServerUrl);
    * const transactionHashes = [
    *   '0xabc123...', // Example transaction hash 1
    *   '0xdef456...', // Example transaction hash 2
    * ];
    * const proofResults = await Promise.all(
-   *   transactionHashes.map((txHash) => apiProvider.generateProof(txHash)),
+   *   transactionHashes.map((txHash) => proofBuilder.generateProof(txHash)),
    * );
    * proofResults.forEach((result) => expect(result.success).toBe(true));
    * const proofDatas = proofResults.map((res) => res.data!);

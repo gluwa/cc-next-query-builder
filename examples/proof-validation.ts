@@ -9,7 +9,7 @@ async function example(): Promise<void> {
   const transactionHash = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH');
 
   // First generate proof which we can validate later
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl);
   const proofResult = await apiProvider.generateProof(transactionHash);
 
   // verify the proof only if generated successfully

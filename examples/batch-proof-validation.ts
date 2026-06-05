@@ -12,7 +12,7 @@ async function example(): Promise<void> {
   const transactionHash2 = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH_2');
   const transactionHash3 = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH_3');
 
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl);
 
   // First generate a shared proof for all 3 transactions, which we can validate later
   const proofResult = await apiProvider.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);

@@ -87,7 +87,7 @@ export interface ContinuityResponse {
   generatedAt: Date;
 }
 
-export interface ProofGenerationResult {
+export interface ProofResult {
   success: boolean;
   data?: ContinuityResponse;
   error?: string;
@@ -109,13 +109,13 @@ export interface BatchMerkleProofEntry {
   merkleProof: TransactionMerkleProof;
 }
 
-export interface BatchProofGenerationResult {
+export interface BatchProofResult {
   success: boolean;
   data?: BatchContinuityResponse;
   error?: string;
 }
 
-export interface ProofGenerator {
-  generateProof(transactionHash: string): Promise<ProofGenerationResult>;
-  generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult>;
+export interface ProofProvider {
+  generateProof(transactionHash: string): Promise<ProofResult>;
+  generateBatchProof(transactionHashes: string[]): Promise<BatchProofResult>;
 }

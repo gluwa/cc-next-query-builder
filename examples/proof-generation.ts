@@ -6,7 +6,7 @@ async function example(): Promise<void> {
   const chainKey = parseInt(utils.env.getEnv('SOURCE_CHAIN_KEY'));
   const transactionHash = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH');
 
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl);
   const proofResult = await apiProvider.generateProof(transactionHash);
   if (proofResult.success) {
     // Use the proof data

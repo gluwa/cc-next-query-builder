@@ -19,7 +19,7 @@ async function example(): Promise<void> {
   await chainInfoProvider.waitUntilHeightAttested(chainKey, txHeight);
 
   // Once the block is attested we can request the proof from the API server
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl);
   const proofResult = await apiProvider.generateProof(txHash);
 
   if (proofResult.success && proofResult.data) {
