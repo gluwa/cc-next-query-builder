@@ -87,11 +87,11 @@ class ApiClient {
 }
 
 /**
- * Proof generator that fetches proofs from a remote API.
- * It uses an HTTP client to communicate with the API server.
+ * Proof provider that fetches proofs from a remote service.
+ * It uses an HTTP client to communicate with the API service.
  * Timeout can be configured for the HTTP requests.
  *
- * Server is expected to expose an endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
+ * Service is expected to expose an HTTP endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
  *
  */
 export class ProofBuilder implements ProofProvider {
@@ -105,7 +105,7 @@ export class ProofBuilder implements ProofProvider {
   }
 
   /**
-   * Generates a proof for the given transaction hash by querying the remote proof API server.
+   * Generates a proof for the given transaction hash by querying the remote proof API service.
    *
    * Transaction hash should be provided as a hex string, and should exists in the source chain for which the
    * chainKey was specified during the generator construction.
@@ -153,7 +153,7 @@ export class ProofBuilder implements ProofProvider {
   }
 
   /**
-   * Generates proofs for a batch of transaction hashes by querying the remote proof API server.
+   * Generates proofs for a batch of transaction hashes by querying the remote proof API service.
    *
    * Transaction hashes should be provided as an array of hex strings, and should exist in the source chain for which the
    * chainKey was specified during the generator construction.
@@ -230,17 +230,17 @@ export class ProofBuilder implements ProofProvider {
    * Waits until a specific block height is attested *and available in the proof builder*.
    *
    * This method polls the proof builder (`/api/v1/attested-height/{chainKey}`) until the
-   * requested `targetHeight` has been attested and ingested into the server’s in-memory cache.
+   * requested `targetHeight` has been attested and ingested into the service's in-memory cache.
    *
    * ⚠️ This should be called before submitting proof requests. Attempting to generate a proof
-   * for a block that has not yet been attested (or fully indexed by the server) may result in
+   * for a block that has not yet been attested (or fully indexed by the service) may result in
    * failures or retriable errors.
    *
    * @param chainKey - The unique identifier for the source chain on the Creditcoin network
    * @param targetHeight - The block height to wait for
    * @param pollIntervalMs - Interval between polling attempts (default: 15 seconds)
    * @param waitTimeoutMs - Maximum time to wait before timing out (default: 15 minutes)
-   * @param extraDelayMs - Extra wait time to ensure consistency in case we request the proof from a different proof gen server due to load balancing
+   * @param extraDelayMs - Extra wait time to ensure consistency in case we request the proof from a different proof builder service due to load balancing
    *
    * @returns A Promise that resolves once the target height is attested and available
    *
@@ -253,7 +253,7 @@ export class ProofBuilder implements ProofProvider {
    *
    * const proofBuilder = new proof.api.ProofBuilder(chainKey, apiUrl);
    *
-   * // Wait until the proof-gen server is ready to serve proofs at this height
+   * // Wait until the proof builder service is ready to serve proofs at this height
    * await proofBuilder.waitUntilHeightAttested(chainKey, targetHeight);
    *
    * // Safe to request proofs at or below targetHeight
@@ -261,7 +261,7 @@ export class ProofBuilder implements ProofProvider {
    * ```
    *
    * @remarks
-   * - This method relies on the proof-gen server’s internal attestation cache,
+   * - This method relies on the proof builder service’s internal attestation cache,
    *   not directly on-chain data or precompiles.
    * - There may be a delay between on-chain finalization and availability via this API.
    * - The polling interval and timeout should be tuned based on expected network conditions.
@@ -284,12 +284,12 @@ export class ProofBuilder implements ProofProvider {
       if (latestAttestedHeight == null) {
         console.warn(`⚠️ No attested height in prover cache for chain key ${chainKey}. Retrying...`);
       } else if (latestAttestedHeight >= targetHeight) {
-        // Add delay in case of inconsistency between proof gen servers
+        // Add delay in case of inconsistency between proof builder services
         await new Promise((resolve) => setTimeout(resolve, extraDelayMs));
         return;
       } else {
         console.debug(
-          `Height ${targetHeight} not yet attested and in proof server cache for chain key ${chainKey}. Latest height: ${latestAttestedHeight}. Retrying in ${pollIntervalMs}ms...`,
+          `Height ${targetHeight} not yet attested and in proof builder service cache for chain key ${chainKey}. Latest height: ${latestAttestedHeight}. Retrying in ${pollIntervalMs}ms...`,
         );
       }
 
