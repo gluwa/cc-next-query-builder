@@ -77,10 +77,40 @@ async fn block_handler(
 
     fs::create_dir_all(format!("{}/{}", path_to_store_json, block_number))?;
 
-    let block = provider
-        .get_block_by_number(block_number.into(), BlockTransactionsKind::Full)
-        .await?
-        .unwrap();
+    // Retry the block fetch up to 5 times with a 1s delay; the node may not
+    // have the block indexed yet at the moment we get notified.
+    const MAX_ATTEMPTS: u32 = 5;
+    const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+    let mut block = None;
+    let mut last_err: Option<anyhow::Error> = None;
+    for attempt in 1..=MAX_ATTEMPTS {
+        match provider
+            .get_block_by_number(block_number.into(), BlockTransactionsKind::Full)
+            .await
+        {
+            Ok(Some(b)) => {
+                block = Some(b);
+                break;
+            }
+            Ok(None) => {
+                last_err = Some(anyhow::anyhow!(
+                    "block {block_number} not found (attempt {attempt}/{MAX_ATTEMPTS})"
+                ));
+            }
+            Err(e) => {
+                last_err = Some(anyhow::anyhow!(
+                    "failed to fetch block {block_number} (attempt {attempt}/{MAX_ATTEMPTS}): {e}"
+                ));
+            }
+        }
+        if attempt < MAX_ATTEMPTS {
+            println!("    retrying block --- {block_number} (attempt {attempt}/{MAX_ATTEMPTS})");
+            tokio::time::sleep(RETRY_DELAY).await;
+        }
+    }
+    let block = block.ok_or_else(|| {
+        last_err.unwrap_or_else(|| anyhow::anyhow!("failed to fetch block {block_number}"))
+    })?;
 
     let tx_hashes = block.transactions.hashes();
 
