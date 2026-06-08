@@ -58,7 +58,7 @@ transactions using Merkle proofs and continuity proofs. See
 ### Batch proof generation and validation
 
 When working with multiple transactions at the same time you can use
-`ProofBuilder.generateBatchProof()` and
+`ProofBuilder.getBatchProof()` and
 `PrecompileBlockProver.verifyBatch()` to generate and verify batch proofs
 instead of iterating over each transaction one at a time. See
 [examples/batch-proof-validation.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/batch-proof-validation.ts).

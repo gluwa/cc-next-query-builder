@@ -219,10 +219,10 @@ test('RawProofBuilder: should return proof', async () => {
   const block = await blockProvider.getBlockWithReceipts(11);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const rawBuilder = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
-  const result = await generator.generateProof(transactionHash);
+  const result = await rawBuilder.getProof(transactionHash);
 
   // We expect a successful proof generation
   expect(result.success).toBe(true);
@@ -233,10 +233,10 @@ test('RawProofBuilder: should return error for non-existent transaction', async 
   const blockProvider = new MockBlockProvider();
   const continuityProvider = new MockContinuityProvider();
 
-  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const rawBuilder = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-  const result = await generator.generateProof(transactionHash);
+  const result = await rawBuilder.getProof(transactionHash);
 
   // Expect an error since transaction does not exist
   expect(result.success).toBe(false);
@@ -269,10 +269,10 @@ test('RawProofBuilder: return error if no lower bound', async () => {
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const rawBuilder = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
-  const result = await generator.generateProof(transactionHash);
+  const result = await rawBuilder.getProof(transactionHash);
 
   // Expect an error since lower bound is missing
   expect(result.success).toBe(false);
@@ -307,10 +307,10 @@ test('RawProofBuilder: return error if no upper bound', async () => {
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const rawBuilder = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
-  const result = await generator.generateProof(transactionHash);
+  const result = await rawBuilder.getProof(transactionHash);
 
   // Expect an error since upper bound is missing
   expect(result.success).toBe(false);
@@ -346,10 +346,10 @@ test('RawProofBuilder: return error if upper bound is above current block height
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const rawBuilder = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
-  const result = await generator.generateProof(transactionHash);
+  const result = await rawBuilder.getProof(transactionHash);
 
   // Expect an error since upper bound is above latest block number
   expect(result.success).toBe(false);
@@ -412,14 +412,14 @@ test.skip('E2E ProofProvider integration test', async () => {
   console.log(`Waiting for block ${blockToWait} to be attestated...`);
   await chainInfoProvider.waitUntilHeightAttested(chainKey, blockToWait);
 
-  // First we test with the raw proof generator
+  // First we test with the raw proof builder
   const rawproofProvider = new proofProvider.raw.RawProofBuilder(
     chainKey,
     blockProvider,
     chainInfoProvider,
     EncodingVersion.V1,
   );
-  const rawProofResult = await rawproofProvider.generateProof(txHash1);
+  const rawProofResult = await rawproofProvider.getProof(txHash1);
   expect(rawProofResult.success).toBe(true);
 
   const proofData = rawProofResult.data!;
@@ -440,7 +440,7 @@ test.skip('E2E ProofProvider integration test', async () => {
   const apiServerUrl = 'http://localhost:3100';
   const requestTimeout = 5000; // 5 seconds
   const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl, requestTimeout);
-  const apiProofResult_1 = await apiProvider.generateProof(txHash1);
+  const apiProofResult_1 = await apiProvider.getProof(txHash1);
   expect(apiProofResult_1.success).toBe(true);
 
   const apiProofData_1 = apiProofResult_1.data!;
@@ -453,7 +453,7 @@ test.skip('E2E ProofProvider integration test', async () => {
   );
   expect(proveResultApi_1).toBe(true);
 
-  const apiProofBatchResult = await apiProvider.generateBatchProof([txHash1, txHash2]);
+  const apiProofBatchResult = await apiProvider.getBatchProof([txHash1, txHash2]);
   expect(apiProofBatchResult.success).toBe(true);
   const batchProofData = apiProofBatchResult.data!;
 

@@ -119,7 +119,7 @@ export class ProofBuilder implements ProofProvider {
    * const chainKey = 2; // Example chain key
    * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
-   * const proofResult = await proofBuilder.generateProof(transactionHash);
+   * const proofResult = await proofBuilder.getProof(transactionHash);
    * // Results in:
    * // {
    * //   success: true,
@@ -142,7 +142,7 @@ export class ProofBuilder implements ProofProvider {
    * // }
    * ```
    */
-  public async generateProof(transactionHash: string): Promise<ProofResult> {
+  public async getProof(transactionHash: string): Promise<ProofResult> {
     try {
       const continuityProof = await this.client.queryProofFor(this.chainKey, transactionHash);
 
@@ -166,7 +166,7 @@ export class ProofBuilder implements ProofProvider {
    * const chainKey = 2;
    * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
-   * const batchProofResult = await proofBuilder.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
+   * const batchProofResult = await proofBuilder.getBatchProof([transactionHash1, transactionHash2, transactionHash3]);
    * // Results in:
    * // [
    * //   {
@@ -216,7 +216,7 @@ export class ProofBuilder implements ProofProvider {
    * // ]
    * ```
    */
-  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
+  public async getBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
     try {
       const continuityProof = await this.client.queryProofBatchFor(this.chainKey, transactionHashes);
 
@@ -257,7 +257,7 @@ export class ProofBuilder implements ProofProvider {
    * await proofBuilder.waitUntilHeightAttested(chainKey, targetHeight);
    *
    * // Safe to request proofs at or below targetHeight
-   * const proof = await proofBuilder.generateProof(txHash);
+   * const proof = await proofBuilder.getProof(txHash);
    * ```
    *
    * @remarks

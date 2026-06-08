@@ -7,7 +7,7 @@ async function example(): Promise<void> {
   const transactionHash = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH');
 
   const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
-  const proofResult = await apiProvider.generateProof(transactionHash);
+  const proofResult = await apiProvider.getProof(transactionHash);
   if (proofResult.success) {
     // Use the proof data
     console.log('Proof generated successfully:', proofResult.data);

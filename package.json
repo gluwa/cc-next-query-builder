@@ -16,7 +16,7 @@
     "exec": "tsc && node dist/index.js",
     "test:smoke": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 jest --config tests/jest.config.ts tests/smoke/* --coverage=false",
     "test:query": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 jest --config tests/jest.config.ts tests/smoke/query.builder.test.ts --coverage=false",
-    "test:proof": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 jest --config tests/jest.config.ts tests/smoke/proof.generator.test.ts --coverage=false",
+    "test:proof": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 jest --config tests/jest.config.ts tests/smoke/proof.provider.test.ts --coverage=false",
     "test:merkle": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 jest --config tests/jest.config.ts tests/smoke/merkle.test.ts --coverage=false"
   },
   "devDependencies": {

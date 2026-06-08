@@ -65,7 +65,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * ```typescript
    * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
-   * const proofResult = await proofBuilder.generateProof(transactionHash);
+   * const proofResult = await proofBuilder.getProof(transactionHash);
    * expect(proofResult.success).toBe(true);
    *
    * // Proof generation was successful, extract data and compute transaction index
@@ -102,7 +102,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * const chainKey = 2; // Example chain key
    * const apiServerUrl = 'https://proof-builder-api.usc-testnet2.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
-   * const proofResult = await proofBuilder.generateProof(transactionHash);
+   * const proofResult = await proofBuilder.getProof(transactionHash);
    * expect(proofResult.success).toBe(true);
    *
    * // Proof generation was successful, extract data and verify on-chain
@@ -154,7 +154,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    *   '0xdef456...', // Example transaction hash 2
    * ];
    * const proofResults = await Promise.all(
-   *   transactionHashes.map((txHash) => proofBuilder.generateProof(txHash)),
+   *   transactionHashes.map((txHash) => proofBuilder.getProof(txHash)),
    * );
    * proofResults.forEach((result) => expect(result.success).toBe(true));
    * const proofDatas = proofResults.map((res) => res.data!);

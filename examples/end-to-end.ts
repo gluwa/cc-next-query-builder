@@ -20,7 +20,7 @@ async function example(): Promise<void> {
 
   // Once the block is attested we can request the proof from the proof builder service
   const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
-  const proofResult = await apiProvider.generateProof(txHash);
+  const proofResult = await apiProvider.getProof(txHash);
 
   if (proofResult.success && proofResult.data) {
     const proofData = proofResult.data;

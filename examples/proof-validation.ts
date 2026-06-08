@@ -10,7 +10,7 @@ async function example(): Promise<void> {
 
   // First generate proof which we can validate later
   const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
-  const proofResult = await apiProvider.generateProof(transactionHash);
+  const proofResult = await apiProvider.getProof(transactionHash);
 
   // verify the proof only if generated successfully
   if (proofResult.success && proofResult.data) {

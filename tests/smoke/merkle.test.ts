@@ -9,7 +9,7 @@ test('MerkleTree should fail to generate proof for non-existent leaf', async () 
   expect(tree.getRoot()).toBe(ZERO_HASH);
 
   // Attempting to generate a proof for any index should throw an error
-  expect(() => tree.generateProof(0)).toThrow();
+  expect(() => tree.getProof(0)).toThrow();
 });
 
 test('MerkleTree should generate correct proof with single leaf', async () => {
@@ -21,7 +21,7 @@ test('MerkleTree should generate correct proof with single leaf', async () => {
   expect(tree.getRoot()).toBe(expectedRoot);
 
   // Proof for the first (and only) leaf (index 0)
-  const proof = tree.generateProof(0);
+  const proof = tree.getProof(0);
 
   const expectedProof = new TransactionMerkleProof(expectedRoot, []);
   expect(proof).toEqual(expectedProof);
@@ -41,7 +41,7 @@ test('MerkleTree should generate correct proof with even number of leaves', asyn
   expect(tree.getRoot()).toBe(expectedRoot);
 
   // Proof for the third leaf (index 2)
-  const proof = tree.generateProof(2);
+  const proof = tree.getProof(2);
 
   const expectedProof = new TransactionMerkleProof(expectedRoot, [
     new MerkleProofEntry('0xd219ac3afe0c22ab430e6bae2cd79be4cb2f51123e63bc789bcc726bc0554f35', false),
@@ -63,7 +63,7 @@ test('MerkleTree should generate correct proof with odd number of leaves', async
   expect(tree.getRoot()).toBe(expectedRoot);
 
   // Proof for the second leaf (index 1)
-  const proof = tree.generateProof(1);
+  const proof = tree.getProof(1);
 
   const expectedProof = new TransactionMerkleProof(expectedRoot, [
     new MerkleProofEntry('0xadcb4c6a939c9a5e181b1d5947223253416fb77ed4d8052756ddf657c4a21079', true),
@@ -116,7 +116,7 @@ test('MerkleTree should generate correct proof with large number of leaves', asy
   expect(tree.getRoot()).toBe(expectedRoot);
 
   // Proof for the tenth leaf (index 9)
-  const proof = tree.generateProof(9);
+  const proof = tree.getProof(9);
 
   const expectedProof = new TransactionMerkleProof(expectedRoot, [
     new MerkleProofEntry('0xc21fb8041448aa652f1b837d01aa9c8f083aba7a8207637415a8d78e4af4fcb5', true),

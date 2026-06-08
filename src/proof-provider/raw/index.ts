@@ -106,7 +106,7 @@ export class RawProofBuilder implements ProofProvider {
     // We can now build the merkle tree and proof
     // for the transaction at txIndex
     const tree = new KeccakMerkleTree(encodedTx);
-    const merkleProof = tree.generateProof(txIndex);
+    const merkleProof = tree.getProof(txIndex);
 
     return {
       success: true,
@@ -117,7 +117,7 @@ export class RawProofBuilder implements ProofProvider {
     };
   }
 
-  public async generateProof(transactionHash: string): Promise<ProofResult> {
+  public async getProof(transactionHash: string): Promise<ProofResult> {
     const merkleProofResult = await this.generateMerkleProofFor(transactionHash);
 
     if (!merkleProofResult.success) {
@@ -146,7 +146,7 @@ export class RawProofBuilder implements ProofProvider {
     }
   }
 
-  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
+  public async getBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
     if (transactionHashes.length === 0) {
       return { success: false, error: 'No transaction hashes provided for batch proof generation' };
     }

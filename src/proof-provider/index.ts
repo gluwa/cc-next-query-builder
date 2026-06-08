@@ -116,6 +116,6 @@ export interface BatchProofResult {
 }
 
 export interface ProofProvider {
-  generateProof(transactionHash: string): Promise<ProofResult>;
-  generateBatchProof(transactionHashes: string[]): Promise<BatchProofResult>;
+  getProof(transactionHash: string): Promise<ProofResult>;
+  getBatchProof(transactionHashes: string[]): Promise<BatchProofResult>;
 }

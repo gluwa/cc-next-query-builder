@@ -15,7 +15,7 @@ async function example(): Promise<void> {
   const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
 
   // First generate a shared proof for all 3 transactions, which we can validate later
-  const proofResult = await apiProvider.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
+  const proofResult = await apiProvider.getBatchProof([transactionHash1, transactionHash2, transactionHash3]);
 
   // verify the proof only if generated successfully
   if (proofResult.success && proofResult.data) {
