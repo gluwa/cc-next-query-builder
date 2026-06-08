@@ -1,11 +1,6 @@
 import { test, expect } from '@jest/globals';
 
-import {
-  MerkleProofEntry,
-  TransactionMerkleProof,
-  KeccakMerkleTree,
-  ZERO_HASH,
-} from '../../src/proof-generator/merkle';
+import { MerkleProofEntry, TransactionMerkleProof, KeccakMerkleTree, ZERO_HASH } from '../../src/proof-provider/merkle';
 
 test('MerkleTree should fail to generate proof for non-existent leaf', async () => {
   const tree = new KeccakMerkleTree([]);

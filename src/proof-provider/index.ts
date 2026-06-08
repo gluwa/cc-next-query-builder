@@ -1,5 +1,5 @@
-export * as raw from './raw-generator';
-export * as api from './api-generator';
+export * as raw from './raw';
+export * as service from './service';
 export * as merkle from './merkle';
 
 import { TransactionMerkleProof } from './merkle';

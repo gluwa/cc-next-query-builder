@@ -1,7 +1,7 @@
 import { test, expect } from '@jest/globals';
 import { Block, JsonRpcProvider, TransactionReceipt, TransactionResponse } from 'ethers';
 
-import { proofGenerator, chainInfo, blockProver } from '../../src';
+import { proofProvider, chainInfo, blockProver } from '../../src';
 import { EncodingVersion, TransactionWithRaw } from '../../src/encoding';
 
 import { keccak256 } from 'ethers';
@@ -50,7 +50,7 @@ interface MockBlock extends Block {
   getTransaction(indexOrHash: number | string): Promise<TransactionResponse>;
 }
 
-class MockBlockProvider implements proofGenerator.raw.blockProvider.BlockProvider {
+class MockBlockProvider implements proofProvider.raw.blockProvider.BlockProvider {
   private blockNumber: number = 1;
 
   private transactions: Map<string, TransactionWithRaw> = new Map();
@@ -196,7 +196,7 @@ class MockContinuityProvider implements chainInfo.ChainInfoProvider {
   }
 }
 
-test('RawProofGenerator: should return proof', async () => {
+test('RawProofBuilder: should return proof', async () => {
   // We create a bunch of mock blocks and transactions along with continuity bounds
   // Using those we will be able to generate a proof for a transaction
 
@@ -219,7 +219,7 @@ test('RawProofGenerator: should return proof', async () => {
   const block = await blockProvider.getBlockWithReceipts(11);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -229,11 +229,11 @@ test('RawProofGenerator: should return proof', async () => {
   expect(result.error).toBeUndefined();
 });
 
-test('RawProofGenerator: should return error for non-existent transaction', async () => {
+test('RawProofBuilder: should return error for non-existent transaction', async () => {
   const blockProvider = new MockBlockProvider();
   const continuityProvider = new MockContinuityProvider();
 
-  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
   const result = await generator.generateProof(transactionHash);
@@ -243,7 +243,7 @@ test('RawProofGenerator: should return error for non-existent transaction', asyn
   expect(result.error).toBe(`Failed to generate merkle proof: Transaction ${transactionHash} not found`);
 });
 
-test('RawProofGenerator: return error if no lower bound', async () => {
+test('RawProofBuilder: return error if no lower bound', async () => {
   // If no lower bound is found, we cannot build the continuity proof
   // so an error will be returned
 
@@ -269,7 +269,7 @@ test('RawProofGenerator: return error if no lower bound', async () => {
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -281,7 +281,7 @@ test('RawProofGenerator: return error if no lower bound', async () => {
   );
 });
 
-test('RawProofGenerator: return error if no upper bound', async () => {
+test('RawProofBuilder: return error if no upper bound', async () => {
   // If no upper bound is found, we cannot build the continuity proof
   // so an error will be returned
 
@@ -307,7 +307,7 @@ test('RawProofGenerator: return error if no upper bound', async () => {
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -319,7 +319,7 @@ test('RawProofGenerator: return error if no upper bound', async () => {
   );
 });
 
-test('RawProofGenerator: return error if upper bound is above current block height', async () => {
+test('RawProofBuilder: return error if upper bound is above current block height', async () => {
   // If latest block number is 10, but upper bound is 20 that means we cannot build the proof
   // since we won't be able to fetch the required blocks to build it, so an error will be returned
 
@@ -346,7 +346,7 @@ test('RawProofGenerator: return error if upper bound is above current block heig
   const block = await blockProvider.getBlockWithReceipts(10);
   const txHash = block.block.transactions[0];
 
-  const generator = new proofGenerator.raw.RawProofGenerator(1, blockProvider, continuityProvider, EncodingVersion.V1);
+  const generator = new proofProvider.raw.RawProofBuilder(1, blockProvider, continuityProvider, EncodingVersion.V1);
 
   const transactionHash = txHash;
   const result = await generator.generateProof(transactionHash);
@@ -358,11 +358,11 @@ test('RawProofGenerator: return error if upper bound is above current block heig
   );
 });
 
-test.skip('E2E ProofGenerator integration test', async () => {
+test.skip('E2E ProofProvider integration test', async () => {
   // Initialize block provider connected to local source ethereum chain
   const sourceChainRpc = 'http://localhost:8545';
   const ethProvider = new JsonRpcProvider(sourceChainRpc);
-  const blockProvider = new proofGenerator.raw.blockProvider.SimpleBlockProvider(ethProvider);
+  const blockProvider = new proofProvider.raw.blockProvider.SimpleBlockProvider(ethProvider);
 
   // Continuity provider using precompile contract from local creditcoin chain
   const ccRpc = 'http://localhost:9944';
@@ -413,13 +413,13 @@ test.skip('E2E ProofGenerator integration test', async () => {
   await chainInfoProvider.waitUntilHeightAttested(chainKey, blockToWait);
 
   // First we test with the raw proof generator
-  const rawProofGenerator = new proofGenerator.raw.RawProofGenerator(
+  const rawproofProvider = new proofProvider.raw.RawProofBuilder(
     chainKey,
     blockProvider,
     chainInfoProvider,
     EncodingVersion.V1,
   );
-  const rawProofResult = await rawProofGenerator.generateProof(txHash1);
+  const rawProofResult = await rawproofProvider.generateProof(txHash1);
   expect(rawProofResult.success).toBe(true);
 
   const proofData = rawProofResult.data!;
@@ -436,10 +436,10 @@ test.skip('E2E ProofGenerator integration test', async () => {
   );
   expect(proveResultRaw).toBe(true);
 
-  // Then we test with the proof generator API server
+  // Then we test with the proof builder service
   const apiServerUrl = 'http://localhost:3100';
   const requestTimeout = 5000; // 5 seconds
-  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl, requestTimeout);
+  const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl, requestTimeout);
   const apiProofResult_1 = await apiProvider.generateProof(txHash1);
   expect(apiProofResult_1.success).toBe(true);
 

@@ -1,8 +1,8 @@
 import { Contract, ContractMethod, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
 
 import BlockProverABI from './block_prover.json';
-import { ContinuityProof } from '../proof-generator';
-import { TransactionMerkleProof } from '../proof-generator/merkle';
+import { ContinuityProof } from '../proof-provider';
+import { TransactionMerkleProof } from '../proof-provider/merkle';
 
 const contractABI = BlockProverABI as unknown as InterfaceAbi;
 

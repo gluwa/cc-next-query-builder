@@ -11,7 +11,7 @@ import { BlockProvider } from './block-provider';
 export * as blockProvider from './block-provider';
 export { EncodingVersion } from '../../encoding';
 
-interface MerkleProofGenerationResult {
+interface MerkleProofResult {
   success: boolean;
   txIndex?: number;
   txBytes?: string;
@@ -21,14 +21,14 @@ interface MerkleProofGenerationResult {
 }
 
 /**
- * RawProofGenerator generates raw proofs for a given transaction.
+ * RawProofBuilder generates raw proofs for a given transaction.
  *
  * It uses a BlockProvider to fetch block and transaction data from the source chain. And a ChainInfoProvider
  * to get chain-specific information needed for proof generation from the attestation chain.
  *
- * The generator constructs Merkle proofs for transactions and continuity proofs for blocks.
+ * The builder constructs Merkle proofs for transactions and continuity proofs for blocks.
  */
-export class RawProofGenerator implements ProofProvider {
+export class RawProofBuilder implements ProofProvider {
   private blockProvider: BlockProvider;
   private chainInfoProvider: ChainInfoProvider;
 
@@ -47,7 +47,7 @@ export class RawProofGenerator implements ProofProvider {
     this.builder = new ContinuityProofBuilder(this.blockProvider, this.chainInfoProvider, chainKey, encoding);
   }
 
-  private async generateMerkleProofFor(transactionHash: string): Promise<MerkleProofGenerationResult> {
+  private async generateMerkleProofFor(transactionHash: string): Promise<MerkleProofResult> {
     // First we need to create merkle proof for the transaction block
     const tx = await this.blockProvider.getTransaction(transactionHash);
     if (!tx) {

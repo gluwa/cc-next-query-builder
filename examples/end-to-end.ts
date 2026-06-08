@@ -1,9 +1,9 @@
-import { chainInfo, blockProver, proofGenerator, utils } from '@gluwa/usc-sdk';
+import { chainInfo, blockProver, proofProvider, utils } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 async function example(): Promise<void> {
   // IMPORTANT: You have to define these values before executing this example
-  const apiServerUrl = utils.env.getEnv('CREDITCOIN_PROOF_GEN_URL');
+  const apiServerUrl = utils.env.getEnv('CREDITCOIN_PROOF_BUILDER_URL');
   const creditcoinRpcUrl = utils.env.getEnv('CREDITCOIN_RPC_URL');
   const chainKey = parseInt(utils.env.getEnv('SOURCE_CHAIN_KEY'));
   const txHash = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH');
@@ -18,8 +18,8 @@ async function example(): Promise<void> {
   // we want to prove, to be attested on the creditcoin chain
   await chainInfoProvider.waitUntilHeightAttested(chainKey, txHeight);
 
-  // Once the block is attested we can request the proof from the API server
-  const apiProvider = new proofGenerator.api.ProofBuilder(chainKey, apiServerUrl);
+  // Once the block is attested we can request the proof from the proof builder s
+  const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
   const proofResult = await apiProvider.generateProof(txHash);
 
   if (proofResult.success && proofResult.data) {
