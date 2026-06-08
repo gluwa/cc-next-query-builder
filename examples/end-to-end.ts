@@ -18,7 +18,7 @@ async function example(): Promise<void> {
   // we want to prove, to be attested on the creditcoin chain
   await chainInfoProvider.waitUntilHeightAttested(chainKey, txHeight);
 
-  // Once the block is attested we can request the proof from the proof builder s
+  // Once the block is attested we can request the proof from the proof builder service
   const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
   const proofResult = await apiProvider.generateProof(txHash);
 

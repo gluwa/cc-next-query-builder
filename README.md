@@ -43,7 +43,7 @@ state of cross-chain attestations. See
 ### Proof building
 
 The `ProofBuilder` provides a convenient way to build proofs by
-communicating with remote dedicate service for it. This component handles
+communicating with a remote dedicate service for it. This component handles
 HTTP communication and provides a clean interface for fetching pre-computed proofs.
 See
 [examples/proof-generation.ts](https://github.com/gluwa/cc-next-query-builder/blob/main/examples/proof-generation.ts).

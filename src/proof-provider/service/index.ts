@@ -118,7 +118,7 @@ export class ProofBuilder implements ProofProvider {
    * ```typescript
    * const chainKey = 2; // Example chain key
    * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const proofBuilder = new proof.api.ProofBuilder(chainKey, builderUrl);
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
    * const proofResult = await proofBuilder.generateProof(transactionHash);
    * // Results in:
    * // {
@@ -165,7 +165,7 @@ export class ProofBuilder implements ProofProvider {
    * ```typescript
    * const chainKey = 2;
    * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const proofBuilder = new proof.api.ProofBuilder(chainKey, builderUrl);
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
    * const batchProofResult = await proofBuilder.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
    * // Results in:
    * // [
@@ -251,7 +251,7 @@ export class ProofBuilder implements ProofProvider {
    * const chainKey = 11;
    * const targetHeight = 10_000;
    *
-   * const proofBuilder = new proof.api.ProofBuilder(chainKey, apiUrl);
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiUrl);
    *
    * // Wait until the proof builder service is ready to serve proofs at this height
    * await proofBuilder.waitUntilHeightAttested(chainKey, targetHeight);
