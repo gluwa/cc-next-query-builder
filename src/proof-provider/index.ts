@@ -1,5 +1,5 @@
-export * as raw from './raw-generator';
-export * as api from './api-generator';
+export * as raw from './raw';
+export * as service from './service';
 export * as merkle from './merkle';
 
 import { TransactionMerkleProof } from './merkle';
@@ -87,7 +87,7 @@ export interface ContinuityResponse {
   generatedAt: Date;
 }
 
-export interface ProofGenerationResult {
+export interface ProofResult {
   success: boolean;
   data?: ContinuityResponse;
   error?: string;
@@ -109,13 +109,13 @@ export interface BatchMerkleProofEntry {
   merkleProof: TransactionMerkleProof;
 }
 
-export interface BatchProofGenerationResult {
+export interface BatchProofResult {
   success: boolean;
   data?: BatchContinuityResponse;
   error?: string;
 }
 
-export interface ProofGenerator {
-  generateProof(transactionHash: string): Promise<ProofGenerationResult>;
-  generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult>;
+export interface ProofProvider {
+  getProof(transactionHash: string): Promise<ProofResult>;
+  getBatchProof(transactionHashes: string[]): Promise<BatchProofResult>;
 }

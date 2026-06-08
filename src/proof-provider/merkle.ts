@@ -151,7 +151,7 @@ export class KeccakMerkleTree {
     return this.levels.length > 0 ? this.levels[this.levels.length - 1][0] : ZERO_HASH;
   }
 
-  public generateProof(leafIndex: number): TransactionMerkleProof {
+  public getProof(leafIndex: number): TransactionMerkleProof {
     // Check if tree is empty
     if (this.levels.length === 0) {
       throw new Error('Cannot generate proof from empty tree');

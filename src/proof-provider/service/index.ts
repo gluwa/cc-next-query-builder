@@ -1,12 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-import {
-  BatchContinuityResponse,
-  BatchProofGenerationResult,
-  ContinuityResponse,
-  ProofGenerationResult,
-  ProofGenerator,
-} from '..';
+import { BatchContinuityResponse, BatchProofResult, ContinuityResponse, ProofResult, ProofProvider } from '..';
 
 const API_BASE_PATH = '/api/v1/proof-by-tx';
 const API_BATCH_BASE_PATH = '/api/v1/proof-batch-by-tx';
@@ -93,25 +87,25 @@ class ApiClient {
 }
 
 /**
- * Proof generator that fetches proofs from a remote API.
- * It uses an HTTP client to communicate with the API server.
+ * Proof provider that fetches proofs from a remote service.
+ * It uses an HTTP client to communicate with the API service.
  * Timeout can be configured for the HTTP requests.
  *
- * Server is expected to expose an endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
+ * Service is expected to expose an HTTP endpoint at `/api/v1/proof-by-tx/{chainKey}/{transactionHash}`
  *
  */
-export class ProverAPIProofGenerator implements ProofGenerator {
+export class ProofBuilder implements ProofProvider {
   private client: ApiClient;
 
   private chainKey: number;
 
-  constructor(chainKey: number, apiServerUrl: string, timeout: number = 5000) {
+  constructor(chainKey: number, builderUrl: string, timeout: number = 5000) {
     this.chainKey = chainKey;
-    this.client = new ApiClient(apiServerUrl, timeout);
+    this.client = new ApiClient(builderUrl, timeout);
   }
 
   /**
-   * Generates a proof for the given transaction hash by querying the remote proof API server.
+   * Generates a proof for the given transaction hash by querying the remote proof API service.
    *
    * Transaction hash should be provided as a hex string, and should exists in the source chain for which the
    * chainKey was specified during the generator construction.
@@ -123,9 +117,9 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
+   * const proofResult = await proofBuilder.getProof(transactionHash);
    * // Results in:
    * // {
    * //   success: true,
@@ -148,7 +142,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * // }
    * ```
    */
-  public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
+  public async getProof(transactionHash: string): Promise<ProofResult> {
     try {
       const continuityProof = await this.client.queryProofFor(this.chainKey, transactionHash);
 
@@ -159,7 +153,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
   }
 
   /**
-   * Generates proofs for a batch of transaction hashes by querying the remote proof API server.
+   * Generates proofs for a batch of transaction hashes by querying the remote proof API service.
    *
    * Transaction hashes should be provided as an array of hex strings, and should exist in the source chain for which the
    * chainKey was specified during the generator construction.
@@ -170,9 +164,9 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * @example
    * ```typescript
    * const chainKey = 2;
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const batchProofResult = await apiProvider.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
+   * const builderUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
+   * const batchProofResult = await proofBuilder.getBatchProof([transactionHash1, transactionHash2, transactionHash3]);
    * // Results in:
    * // [
    * //   {
@@ -222,7 +216,7 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * // ]
    * ```
    */
-  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult> {
+  public async getBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
     try {
       const continuityProof = await this.client.queryProofBatchFor(this.chainKey, transactionHashes);
 
@@ -233,20 +227,20 @@ export class ProverAPIProofGenerator implements ProofGenerator {
   }
 
   /**
-   * Waits until a specific block height is attested *and available in the proof generation server*.
+   * Waits until a specific block height is attested *and available in the proof builder*.
    *
-   * This method polls the proof-gen API (`/api/v1/attested-height/{chainKey}`) until the
-   * requested `targetHeight` has been attested and ingested into the server’s in-memory cache.
+   * This method polls the proof builder (`/api/v1/attested-height/{chainKey}`) until the
+   * requested `targetHeight` has been attested and ingested into the service's in-memory cache.
    *
    * ⚠️ This should be called before submitting proof requests. Attempting to generate a proof
-   * for a block that has not yet been attested (or fully indexed by the server) may result in
+   * for a block that has not yet been attested (or fully indexed by the service) may result in
    * failures or retriable errors.
    *
    * @param chainKey - The unique identifier for the source chain on the Creditcoin network
    * @param targetHeight - The block height to wait for
    * @param pollIntervalMs - Interval between polling attempts (default: 15 seconds)
    * @param waitTimeoutMs - Maximum time to wait before timing out (default: 15 minutes)
-   * @param extraDelayMs - Extra wait time to ensure consistency in case we request the proof from a different proof gen server due to load balancing
+   * @param extraDelayMs - Extra wait time to ensure consistency in case we request the proof from a different proof builder service due to load balancing
    *
    * @returns A Promise that resolves once the target height is attested and available
    *
@@ -257,17 +251,17 @@ export class ProverAPIProofGenerator implements ProofGenerator {
    * const chainKey = 11;
    * const targetHeight = 10_000;
    *
-   * const prover = new ProverAPIProofGenerator(chainKey, apiUrl);
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiUrl);
    *
-   * // Wait until the proof-gen server is ready to serve proofs at this height
-   * await prover.waitUntilHeightAttested(chainKey, targetHeight);
+   * // Wait until the proof builder service is ready to serve proofs at this height
+   * await proofBuilder.waitUntilHeightAttested(chainKey, targetHeight);
    *
    * // Safe to request proofs at or below targetHeight
-   * const proof = await prover.generateProof(txHash);
+   * const proof = await proofBuilder.getProof(txHash);
    * ```
    *
    * @remarks
-   * - This method relies on the proof-gen server’s internal attestation cache,
+   * - This method relies on the proof builder service’s internal attestation cache,
    *   not directly on-chain data or precompiles.
    * - There may be a delay between on-chain finalization and availability via this API.
    * - The polling interval and timeout should be tuned based on expected network conditions.
@@ -290,12 +284,12 @@ export class ProverAPIProofGenerator implements ProofGenerator {
       if (latestAttestedHeight == null) {
         console.warn(`⚠️ No attested height in prover cache for chain key ${chainKey}. Retrying...`);
       } else if (latestAttestedHeight >= targetHeight) {
-        // Add delay in case of inconsistency between proof gen servers
+        // Add delay in case of inconsistency between proof builder services
         await new Promise((resolve) => setTimeout(resolve, extraDelayMs));
         return;
       } else {
         console.debug(
-          `Height ${targetHeight} not yet attested and in proof server cache for chain key ${chainKey}. Latest height: ${latestAttestedHeight}. Retrying in ${pollIntervalMs}ms...`,
+          `Height ${targetHeight} not yet attested and in proof builder service cache for chain key ${chainKey}. Latest height: ${latestAttestedHeight}. Retrying in ${pollIntervalMs}ms...`,
         );
       }
 

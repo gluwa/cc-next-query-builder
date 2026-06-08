@@ -1,8 +1,8 @@
 import { Contract, ContractMethod, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
 
 import BlockProverABI from './block_prover.json';
-import { ContinuityProof } from '../proof-generator';
-import { TransactionMerkleProof } from '../proof-generator/merkle';
+import { ContinuityProof } from '../proof-provider';
+import { TransactionMerkleProof } from '../proof-provider/merkle';
 
 const contractABI = BlockProverABI as unknown as InterfaceAbi;
 
@@ -64,13 +64,13 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @example
    * ```typescript
    * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
+   * const proofResult = await proofBuilder.getProof(transactionHash);
    * expect(proofResult.success).toBe(true);
    *
    * // Proof generation was successful, extract data and compute transaction index
    * const proofData = proofResult.data!;
-   * const blockProver = new proof.blockProver.PrecompileBlockProver(rpcProvider);
+   * const blockProver = new proofProvider.blockProver.PrecompileBlockProver(rpcProvider);
    * const txIndex = await blockProver.computeTransactionIndex(proofData.merkleProof);
    * console.log(`Transaction index within block: ${txIndex}`);
    * ```
@@ -100,9 +100,9 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-   * const proofResult = await apiProvider.generateProof(transactionHash);
+   * const apiServerUrl = 'https://proof-builder-api.usc-testnet2.creditcoin.network';
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
+   * const proofResult = await proofBuilder.getProof(transactionHash);
    * expect(proofResult.success).toBe(true);
    *
    * // Proof generation was successful, extract data and verify on-chain
@@ -147,14 +147,14 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
-   * const apiProvider = new proof.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+   * const apiServerUrl = 'https://proof-builder-api.usc-testnet2.creditcoin.network';
+   * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
    * const transactionHashes = [
    *   '0xabc123...', // Example transaction hash 1
    *   '0xdef456...', // Example transaction hash 2
    * ];
    * const proofResults = await Promise.all(
-   *   transactionHashes.map((txHash) => apiProvider.generateProof(txHash)),
+   *   transactionHashes.map((txHash) => proofBuilder.getProof(txHash)),
    * );
    * proofResults.forEach((result) => expect(result.success).toBe(true));
    * const proofDatas = proofResults.map((res) => res.data!);
@@ -165,7 +165,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * const merkleProofs = proofDatas.map((data) => data.merkleProof);
    *
    * // We merged together the continuity proofs into a single shared proof
-   * const continuityProofs: [number, proof.ContinuityProof][] = proofDatas.map((data) => [data.headerNumber, data.continuityProof]);
+   * const continuityProofs: [number, proofProvider.ContinuityProof][] = proofDatas.map((data) => [data.headerNumber, data.continuityProof]);
    * const mergedProof: ContinuityProof = ContinuityProofBuilder.mergeProofs(continuityProofs);
    *
    * const provingResult = await blockProver.verifyBatch(

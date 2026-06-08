@@ -1,16 +1,16 @@
-import { blockProver, proofGenerator, utils } from '@gluwa/usc-sdk';
+import { blockProver, proofProvider, utils } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 async function example(): Promise<void> {
   // IMPORTANT: You have to define these values before executing this example
-  const apiServerUrl = utils.env.getEnv('CREDITCOIN_PROOF_GEN_URL');
+  const apiServerUrl = utils.env.getEnv('CREDITCOIN_PROOF_BUILDER_URL');
   const creditcoinRpcUrl = utils.env.getEnv('CREDITCOIN_RPC_URL');
   const chainKey = parseInt(utils.env.getEnv('SOURCE_CHAIN_KEY'));
   const transactionHash = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH');
 
   // First generate proof which we can validate later
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
-  const proofResult = await apiProvider.generateProof(transactionHash);
+  const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
+  const proofResult = await apiProvider.getProof(transactionHash);
 
   // verify the proof only if generated successfully
   if (proofResult.success && proofResult.data) {

@@ -1,4 +1,4 @@
-import { BatchMerkleProofEntry, BatchProofGenerationResult, ProofGenerationResult, ProofGenerator } from '..';
+import { BatchMerkleProofEntry, BatchProofResult, ProofResult, ProofProvider } from '..';
 import { ChainInfoProvider } from '../../chain-info';
 
 import { abiEncode, EncodingVersion } from '../../encoding';
@@ -11,7 +11,7 @@ import { BlockProvider } from './block-provider';
 export * as blockProvider from './block-provider';
 export { EncodingVersion } from '../../encoding';
 
-interface MerkleProofGenerationResult {
+interface MerkleProofResult {
   success: boolean;
   txIndex?: number;
   txBytes?: string;
@@ -21,14 +21,14 @@ interface MerkleProofGenerationResult {
 }
 
 /**
- * RawProofGenerator generates raw proofs for a given transaction.
+ * RawProofBuilder generates raw proofs for a given transaction.
  *
  * It uses a BlockProvider to fetch block and transaction data from the source chain. And a ChainInfoProvider
  * to get chain-specific information needed for proof generation from the attestation chain.
  *
- * The generator constructs Merkle proofs for transactions and continuity proofs for blocks.
+ * The builder constructs Merkle proofs for transactions and continuity proofs for blocks.
  */
-export class RawProofGenerator implements ProofGenerator {
+export class RawProofBuilder implements ProofProvider {
   private blockProvider: BlockProvider;
   private chainInfoProvider: ChainInfoProvider;
 
@@ -47,7 +47,7 @@ export class RawProofGenerator implements ProofGenerator {
     this.builder = new ContinuityProofBuilder(this.blockProvider, this.chainInfoProvider, chainKey, encoding);
   }
 
-  private async generateMerkleProofFor(transactionHash: string): Promise<MerkleProofGenerationResult> {
+  private async generateMerkleProofFor(transactionHash: string): Promise<MerkleProofResult> {
     // First we need to create merkle proof for the transaction block
     const tx = await this.blockProvider.getTransaction(transactionHash);
     if (!tx) {
@@ -106,7 +106,7 @@ export class RawProofGenerator implements ProofGenerator {
     // We can now build the merkle tree and proof
     // for the transaction at txIndex
     const tree = new KeccakMerkleTree(encodedTx);
-    const merkleProof = tree.generateProof(txIndex);
+    const merkleProof = tree.getProof(txIndex);
 
     return {
       success: true,
@@ -117,7 +117,7 @@ export class RawProofGenerator implements ProofGenerator {
     };
   }
 
-  public async generateProof(transactionHash: string): Promise<ProofGenerationResult> {
+  public async getProof(transactionHash: string): Promise<ProofResult> {
     const merkleProofResult = await this.generateMerkleProofFor(transactionHash);
 
     if (!merkleProofResult.success) {
@@ -146,7 +146,7 @@ export class RawProofGenerator implements ProofGenerator {
     }
   }
 
-  public async generateBatchProof(transactionHashes: string[]): Promise<BatchProofGenerationResult> {
+  public async getBatchProof(transactionHashes: string[]): Promise<BatchProofResult> {
     if (transactionHashes.length === 0) {
       return { success: false, error: 'No transaction hashes provided for batch proof generation' };
     }

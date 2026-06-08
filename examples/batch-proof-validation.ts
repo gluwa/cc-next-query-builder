@@ -1,9 +1,9 @@
-import { blockProver, proofGenerator, utils } from '@gluwa/usc-sdk';
+import { blockProver, proofProvider, utils } from '@gluwa/usc-sdk';
 import { JsonRpcProvider } from 'ethers';
 
 async function example(): Promise<void> {
   // IMPORTANT: You have to define these values before executing this example
-  const apiServerUrl = utils.env.getEnv('CREDITCOIN_PROOF_GEN_URL');
+  const apiServerUrl = utils.env.getEnv('CREDITCOIN_PROOF_BUILDER_URL');
   const creditcoinRpcUrl = utils.env.getEnv('CREDITCOIN_RPC_URL');
   const chainKey = parseInt(utils.env.getEnv('SOURCE_CHAIN_KEY'));
 
@@ -12,10 +12,10 @@ async function example(): Promise<void> {
   const transactionHash2 = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH_2');
   const transactionHash3 = utils.env.getEnv('SOURCE_CHAIN_TXN_HASH_3');
 
-  const apiProvider = new proofGenerator.api.ProverAPIProofGenerator(chainKey, apiServerUrl);
+  const apiProvider = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
 
   // First generate a shared proof for all 3 transactions, which we can validate later
-  const proofResult = await apiProvider.generateBatchProof([transactionHash1, transactionHash2, transactionHash3]);
+  const proofResult = await apiProvider.getBatchProof([transactionHash1, transactionHash2, transactionHash3]);
 
   // verify the proof only if generated successfully
   if (proofResult.success && proofResult.data) {

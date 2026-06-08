@@ -37,7 +37,7 @@ jobs:
       - name: Execute examples
         env:
           CREDITCOIN_RPC_URL: 'https://rpc.cc3-devnet.creditcoin.network'
-          CREDITCOIN_PROOF_GEN_URL: 'https://prover.cc3-devnet.creditcoin.network/'
+          CREDITCOIN_PROOF_BUILDER_URL: 'https://prover.cc3-devnet.creditcoin.network/'
           # Sepolia Full Archive: 1 / Ethereum Mainnet Full Archive: 2
           # both are attested to since genesis
           SOURCE_CHAIN_KEY: 1
