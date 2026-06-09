@@ -1,4 +1,5 @@
 use alloy::{
+    eips::BlockNumberOrTag,
     primitives::B256,
     providers::{Provider, ProviderBuilder, WsConnect},
     rpc::types::{BlockTransactionsKind, TransactionReceipt},
@@ -73,7 +74,7 @@ async fn block_handler(
     block_number: u64,
     path_to_store_json: String,
 ) -> Result<()> {
-    println!("new block --- {:?}", block_number);
+    println!("new finalized block --- {:?}", block_number);
 
     fs::create_dir_all(format!("{}/{}", path_to_store_json, block_number))?;
 
@@ -194,23 +195,49 @@ async fn main() -> Result<()> {
         .on_ws(WsConnect::new(args.eth_rpc_url))
         .await?;
 
+    // Subscribe to new chain heads as a cheap notification signal, but only
+    // process blocks once they reach the `finalized` tag. Eth JSON-RPC has no
+    // native subscription for finalized blocks, so on every new head we query
+    // the current finalized block and process any newly finalized blocks since
+    // the last one we handled.
     let subscriber = provider.subscribe_blocks().await?;
     let mut stream = subscriber.into_stream();
-    while let Some(block) = stream.next().await {
-        let _ = block_handler(
-            provider.clone(),
-            block.number,
-            args.path_to_store_json.clone(),
-        )
-        .await;
+    let mut last_processed_finalized: Option<u64> = None;
+    'outer: while stream.next().await.is_some() {
+        let finalized_block = provider
+            .get_block_by_number(BlockNumberOrTag::Finalized, BlockTransactionsKind::Hashes)
+            .await?;
 
-        let current = start.elapsed()?;
-        if current.as_secs() >= timeout_minutes * 60 {
-            println!(
-                "=== {:?} mins timeout reached. exiting ...",
-                timeout_minutes
-            );
-            break;
+        let finalized_number = match finalized_block {
+            Some(b) => b.header.number,
+            None => {
+                println!("    no finalized block available yet, waiting ...");
+                continue;
+            }
+        };
+
+        let next_to_process = match last_processed_finalized {
+            Some(last) => last + 1,
+            None => finalized_number,
+        };
+
+        for block_number in next_to_process..=finalized_number {
+            let _ = block_handler(
+                provider.clone(),
+                block_number,
+                args.path_to_store_json.clone(),
+            )
+            .await;
+            last_processed_finalized = Some(block_number);
+
+            let current = start.elapsed()?;
+            if current.as_secs() >= timeout_minutes * 60 {
+                println!(
+                    "=== {:?} mins timeout reached. exiting ...",
+                    timeout_minutes
+                );
+                break 'outer;
+            }
         }
     }
 

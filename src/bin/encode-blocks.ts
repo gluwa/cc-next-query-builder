@@ -104,11 +104,10 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
 
   const provider = new WebSocketProvider(rpcUrl);
 
-  // Fire the event whenever the block changes.
-  // We can also fire on 'safe' or 'finalized' blocks
-  provider.on('block', async (blockNumber) => {
+  // Only fire on 'finalized' blocks; reorgs cannot affect them anymore.
+  provider.on('finalized', async (blockNumber) => {
     // cost: (80 + 160 * <txns in block>)
-    await blockHandler('block', provider, blockNumber, pathToStoreJson);
+    await blockHandler('finalized block', provider, blockNumber, pathToStoreJson);
 
     if (Math.floor((Date.now() - start) / 60000) >= timeoutMinutes) {
       console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
