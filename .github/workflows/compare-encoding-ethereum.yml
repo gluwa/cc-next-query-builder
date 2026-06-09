@@ -8,7 +8,7 @@ name: compare-encoding-ethereum
       - '**.ts'
       - '**Cargo**'
       - '**package*.json'
-      - '.github/workflows/compare-encoding.yml'
+      - '.github/workflows/compare-encoding-*.yml'
   schedule:
     - cron: '12 */12 * * *'
   workflow_dispatch:
