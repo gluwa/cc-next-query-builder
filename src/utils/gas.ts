@@ -46,3 +46,22 @@ export async function computeGasLimit(
 
   return gasLimit;
 }
+
+/**
+ * Maximum block gas cap used to compute relative gas usage. Currently set
+ * to 75,000,000 (75M gas), the cap used on Creditcoin.
+ */
+export const MAX_GAS_CAP = BigInt(75_000_000);
+
+/**
+ * Expresses `actualGas` as a percentage (0..100) of {@link MAX_GAS_CAP}.
+ * The result is clamped to `[0, 100]`.
+ */
+export function gasAsPercentageOfMax(actualGas: bigint): number {
+  if (actualGas <= BigInt(0)) return 0;
+  if (actualGas >= MAX_GAS_CAP) return 100;
+  // Scale to basis points first to preserve two decimals of precision
+  // before converting to a Number.
+  const bps = (actualGas * BigInt(10_000)) / MAX_GAS_CAP;
+  return Number(bps) / 100;
+}
