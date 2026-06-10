@@ -25,12 +25,9 @@ jobs:
     outputs:
       # vvv how long to keep encoding blocks
       timeout-minutes: ${{ steps.cron-env.outputs.timeout-minutes || 3 }}
-      step-timeout: ${{ steps.cron-env.outputs.step-timeout || 10 }}
-      # ^^^ how long to wait for the encoding-blocks program to exit.
-      # WARNING: must be greater than the value of `timeout-minutes`.
-      # The internal timeout is checked on every new finalized block, which
-      # only ticks every ~12s (mainnet), so allow a generous buffer for the
-      # process to exit gracefully instead of getting killed by the step.
+      step-timeout: ${{ steps.cron-env.outputs.step-timeout || 5 }}
+      # ^^^ how long to wait for the encoding-blocks program to exit
+      # WARNING: must be greater than the value of `timeout-minutes`
 
     steps:
       - name: Cron ENV
@@ -39,7 +36,7 @@ jobs:
         run: |
           # shellcheck disable=SC2129
           echo "timeout-minutes=60" >> "$GITHUB_OUTPUT"
-          echo "step-timeout=67" >> "$GITHUB_OUTPUT"
+          echo "step-timeout=62" >> "$GITHUB_OUTPUT"
 
   alloy-encode:
     needs:
