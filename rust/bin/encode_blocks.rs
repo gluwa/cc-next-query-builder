@@ -196,7 +196,17 @@ async fn main() -> Result<()> {
 
     let subscriber = provider.subscribe_blocks().await?;
     let mut stream = subscriber.into_stream();
+    let mut last_seen_block: Option<u64> = None;
     while let Some(block) = stream.next().await {
+        if last_seen_block == Some(block.number) {
+            println!(
+                "    skipping duplicate notification for block --- {:?}",
+                block.number
+            );
+            continue;
+        }
+        last_seen_block = Some(block.number);
+
         let _ = block_handler(
             provider.clone(),
             block.number,
