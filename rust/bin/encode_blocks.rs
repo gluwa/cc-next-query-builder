@@ -31,24 +31,40 @@ async fn encode_transaction(
     provider: impl Provider,
     tx_hash_str: &str,
     rx_or_none: Option<TransactionReceipt>,
-) -> String {
+) -> Option<String> {
     let tx_hash = B256::from_str(tx_hash_str).unwrap();
 
-    let tx = provider
-        .get_transaction_by_hash(tx_hash)
-        .await
-        .unwrap()
-        .unwrap();
+    let tx = match provider.get_transaction_by_hash(tx_hash).await {
+        Ok(Some(tx)) => tx,
+        Ok(None) => {
+            println!("    skipping tx {tx_hash_str}: transaction not found via RPC");
+            return None;
+        }
+        Err(e) => {
+            println!("    skipping tx {tx_hash_str}: get_transaction_by_hash failed: {e}");
+            return None;
+        }
+    };
 
-    let mut rx = rx_or_none.clone();
-    if rx_or_none.is_none() {
-        rx = provider.get_transaction_receipt(tx_hash).await.unwrap();
-    }
+    let rx = match rx_or_none {
+        Some(rx) => rx,
+        None => match provider.get_transaction_receipt(tx_hash).await {
+            Ok(Some(rx)) => rx,
+            Ok(None) => {
+                println!("    skipping tx {tx_hash_str}: receipt not found via RPC");
+                return None;
+            }
+            Err(e) => {
+                println!("    skipping tx {tx_hash_str}: get_transaction_receipt failed: {e}");
+                return None;
+            }
+        },
+    };
 
-    let encoded_data = abi_encode(tx, rx.expect("receipt missing"), EncodingVersion::V1).unwrap();
+    let encoded_data = abi_encode(tx, rx, EncodingVersion::V1).unwrap();
     let as_str = hex::encode(encoded_data.abi());
 
-    format!("0x{}", as_str)
+    Some(format!("0x{}", as_str))
 }
 
 async fn encode_and_write_to_disk(
@@ -58,7 +74,12 @@ async fn encode_and_write_to_disk(
     tx_hash: String,
     rx_or_none: Option<TransactionReceipt>,
 ) {
-    let encoded_data = encode_transaction(provider, &tx_hash.to_string(), rx_or_none).await;
+    let Some(encoded_data) = encode_transaction(provider, &tx_hash.to_string(), rx_or_none).await
+    else {
+        // RPC returned None for this transaction (e.g. transient reorg or
+        // unindexed tx); skip it rather than writing anything to disk.
+        return;
+    };
 
     // <path>/<block_num>/<tx_hash>.txt
     fs::write(
