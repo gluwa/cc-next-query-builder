@@ -37,6 +37,14 @@ export interface BlockProvingProvider {
     merkleProofs: TransactionMerkleProof[],
     sharedProof: ContinuityProof,
   ): Promise<boolean>;
+  verifyAndEmitBatch(
+    signer: Signer,
+    chainKey: number,
+    heights: number[],
+    encodedTransaction: string[],
+    merkleProofs: TransactionMerkleProof[],
+    sharedProof: ContinuityProof,
+  ): Promise<ContractTransactionResponse>;
 }
 
 /**
@@ -48,6 +56,7 @@ const CALCULATE_TX_INDEX = 'calculateTxIndex((bytes32,(bytes32,bool)[]))';
 const VERIFY_SINGLE = 'verify(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
 const VERIFY_AND_EMIT_SINGLE = 'verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
 const VERIFY_BATCH = 'verify(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
+const VERIFY_AND_EMIT_BATCH = 'verifyAndEmit(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
 
 /**
  * Implementation of BlockProvingProvider using the precompile contract on Creditcoin.
@@ -262,6 +271,62 @@ export class PrecompileBlockProver implements BlockProvingProvider {
       return await method.staticCall(chainKey, heights, encodedTransaction, merkleProofs, sharedProof);
     } catch (error: any) {
       console.error(`Error trying to verify transaction: ${error.shortMessage}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Verifies a batch of transaction proofs on-chain in a state-changing transaction
+   * that emits a `TransactionVerified(uint64,uint64,uint64)` event for each successfully
+   * verified transaction.
+   *
+   * Unlike {@link verifyBatch}, this method submits an actual transaction signed by the
+   * provided signer. The returned {@link ContractTransactionResponse} can be awaited via
+   * `.wait()` to obtain the receipt and parse the emitted events.
+   *
+   * The precompile reverts on failed verification, so a successful receipt implies all
+   * proofs were valid.
+   *
+   * @param signer - The signer used to submit the on-chain transaction
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @param heights - An array of block heights for each transaction being verified
+   * @param encodedTransaction - An array of ABI-encoded transaction data using the `abiEncode` function or equivalent.
+   * @param merkleProofs - An array of Merkle proofs for each transaction inclusion
+   * @param sharedProof - A shared continuity proof for the batch of blocks
+   * @returns A promise resolving to the pending transaction response
+   * @throws Error if the transaction submission fails
+   *
+   * @example
+   * ```typescript
+   * const wallet = new Wallet(privateKey, rpcProvider);
+   * const tx = await blockProver.verifyAndEmitBatch(
+   *   wallet,
+   *   chainKey,
+   *   heights,
+   *   encodedTransactions,
+   *   merkleProofs,
+   *   mergedProof,
+   * );
+   * const receipt = await tx.wait();
+   * // Receipt contains one `TransactionVerified(chainKey, height, transactionIndex)`
+   * // event log per verified transaction.
+   * ```
+   */
+  public async verifyAndEmitBatch(
+    signer: Signer,
+    chainKey: number,
+    heights: number[],
+    encodedTransaction: string[],
+    merkleProofs: TransactionMerkleProof[],
+    sharedProof: ContinuityProof,
+  ): Promise<ContractTransactionResponse> {
+    const contractWithSigner = this.blockProverContract.connect(signer) as Contract;
+    const method: ContractMethod = contractWithSigner.getFunction(VERIFY_AND_EMIT_BATCH);
+
+    try {
+      return await method(chainKey, heights, encodedTransaction, merkleProofs, sharedProof);
+    } catch (error: any) {
+      console.error(`Error trying to verify and emit transaction: ${error.shortMessage}`);
       throw error;
     }
   }
