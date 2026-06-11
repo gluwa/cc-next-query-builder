@@ -125,8 +125,15 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
   // Fire the event whenever the block changes.
   // We can also fire on 'safe' or 'finalized' blocks
   provider.on('block', async (blockNumber) => {
-    // cost: (80 + 160 * <txns in block>)
-    await blockHandler('block', provider, blockNumber, pathToStoreJson);
+    try {
+      // cost: (80 + 160 * <txns in block>)
+      await blockHandler('block', provider, blockNumber, pathToStoreJson);
+    } catch (err) {
+      // A transient RPC error (e.g. `-32000 internal error` from the upstream
+      // provider) should not kill the whole run. Log it and move on to the
+      // next block — we'd rather skip one block than abort 60 minutes of work.
+      console.error(`!!! skipping block ${blockNumber} due to error:`, err);
+    }
 
     if (Math.floor((Date.now() - start) / 60000) >= timeoutMinutes) {
       console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
