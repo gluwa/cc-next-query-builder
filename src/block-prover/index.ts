@@ -4,6 +4,7 @@ import {
   ContractTransactionResponse,
   InterfaceAbi,
   JsonRpcApiProvider,
+  Overrides,
   Signer,
 } from 'ethers';
 
@@ -29,6 +30,7 @@ export interface BlockProvingProvider {
     encodedTransaction: string,
     merkleProof: TransactionMerkleProof,
     continuityProof: ContinuityProof,
+    overrides?: Overrides,
   ): Promise<ContractTransactionResponse>;
   verifyBatch(
     chainKey: number,
@@ -44,6 +46,7 @@ export interface BlockProvingProvider {
     encodedTransaction: string[],
     merkleProofs: TransactionMerkleProof[],
     sharedProof: ContinuityProof,
+    overrides?: Overrides,
   ): Promise<ContractTransactionResponse>;
 }
 
@@ -176,6 +179,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @param encodedTransaction - The ABI-encoded transaction data using the `abiEncode` function or equivalent.
    * @param merkleProof - The Merkle proof for the transaction inclusion
    * @param continuityProof - The continuity proof for the block
+   * @param overrides - Optional ethers `Overrides` (e.g. `nonce`, `gasLimit`, `maxFeePerGas`) forwarded to the contract call
    * @returns A promise resolving to the pending transaction response
    * @throws Error if the transaction submission fails
    *
@@ -201,12 +205,13 @@ export class PrecompileBlockProver implements BlockProvingProvider {
     encodedTransaction: string,
     merkleProof: TransactionMerkleProof,
     continuityProof: ContinuityProof,
+    overrides: Overrides = {},
   ): Promise<ContractTransactionResponse> {
     const contractWithSigner = this.blockProverContract.connect(signer) as Contract;
     const method: ContractMethod = contractWithSigner.getFunction(VERIFY_AND_EMIT_SINGLE);
 
     try {
-      return await method(chainKey, height, encodedTransaction, merkleProof, continuityProof);
+      return await method(chainKey, height, encodedTransaction, merkleProof, continuityProof, overrides);
     } catch (error: any) {
       console.error(`Error trying to verify and emit transaction: ${error.shortMessage}`);
       throw error;
@@ -293,6 +298,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @param encodedTransaction - An array of ABI-encoded transaction data using the `abiEncode` function or equivalent.
    * @param merkleProofs - An array of Merkle proofs for each transaction inclusion
    * @param sharedProof - A shared continuity proof for the batch of blocks
+   * @param overrides - Optional ethers `Overrides` (e.g. `nonce`, `gasLimit`, `maxFeePerGas`) forwarded to the contract call
    * @returns A promise resolving to the pending transaction response
    * @throws Error if the transaction submission fails
    *
@@ -319,12 +325,13 @@ export class PrecompileBlockProver implements BlockProvingProvider {
     encodedTransaction: string[],
     merkleProofs: TransactionMerkleProof[],
     sharedProof: ContinuityProof,
+    overrides: Overrides = {},
   ): Promise<ContractTransactionResponse> {
     const contractWithSigner = this.blockProverContract.connect(signer) as Contract;
     const method: ContractMethod = contractWithSigner.getFunction(VERIFY_AND_EMIT_BATCH);
 
     try {
-      return await method(chainKey, heights, encodedTransaction, merkleProofs, sharedProof);
+      return await method(chainKey, heights, encodedTransaction, merkleProofs, sharedProof, overrides);
     } catch (error: any) {
       console.error(`Error trying to verify and emit transaction: ${error.shortMessage}`);
       throw error;
