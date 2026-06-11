@@ -1,4 +1,11 @@
-import { Contract, ContractMethod, InterfaceAbi, JsonRpcApiProvider } from 'ethers';
+import {
+  Contract,
+  ContractMethod,
+  ContractTransactionResponse,
+  InterfaceAbi,
+  JsonRpcApiProvider,
+  Signer,
+} from 'ethers';
 
 import BlockProverABI from './block_prover.json';
 import { ContinuityProof } from '../proof-provider';
@@ -15,6 +22,14 @@ export interface BlockProvingProvider {
     merkleProof: TransactionMerkleProof,
     continuityProof: ContinuityProof,
   ): Promise<boolean>;
+  verifyAndEmitSingle(
+    signer: Signer,
+    chainKey: number,
+    height: number,
+    encodedTransaction: string,
+    merkleProof: TransactionMerkleProof,
+    continuityProof: ContinuityProof,
+  ): Promise<ContractTransactionResponse>;
   verifyBatch(
     chainKey: number,
     heights: number[],
@@ -31,6 +46,7 @@ export const BLOCK_PROVER_PRECOMPILE_ADDRESS = '0x000000000000000000000000000000
 
 const CALCULATE_TX_INDEX = 'calculateTxIndex((bytes32,(bytes32,bool)[]))';
 const VERIFY_SINGLE = 'verify(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
+const VERIFY_AND_EMIT_SINGLE = 'verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
 const VERIFY_BATCH = 'verify(uint64,uint64[],bytes[],(bytes32,(bytes32,bool)[])[],(bytes32,bytes32[]))';
 
 /**
@@ -130,6 +146,60 @@ export class PrecompileBlockProver implements BlockProvingProvider {
       return await method.staticCall(chainKey, height, encodedTransaction, merkleProof, continuityProof);
     } catch (error: any) {
       console.error(`Error trying to verify transaction: ${error.shortMessage}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Verifies a single transaction proof on-chain in a state-changing transaction
+   * that emits a `TransactionVerified(uint64,uint64,uint64)` event on success.
+   *
+   * Unlike {@link verifySingle}, this method submits an actual transaction signed
+   * by the provided signer. The returned {@link ContractTransactionResponse} can be
+   * awaited via `.wait()` to obtain the receipt and parse the emitted event.
+   *
+   * The precompile reverts on failed verification, so a successful receipt implies
+   * the proof was valid.
+   *
+   * @param signer - The signer used to submit the on-chain transaction
+   * @param chainKey - The unique identifier for the source chain on the creditcoin network
+   * @param height - The block height of the transaction being verified
+   * @param encodedTransaction - The ABI-encoded transaction data using the `abiEncode` function or equivalent.
+   * @param merkleProof - The Merkle proof for the transaction inclusion
+   * @param continuityProof - The continuity proof for the block
+   * @returns A promise resolving to the pending transaction response
+   * @throws Error if the transaction submission fails
+   *
+   * @example
+   * ```typescript
+   * const wallet = new Wallet(privateKey, rpcProvider);
+   * const tx = await blockProver.verifyAndEmitSingle(
+   *   wallet,
+   *   proofData.chainKey,
+   *   proofData.headerNumber,
+   *   proofData.txBytes,
+   *   proofData.merkleProof,
+   *   proofData.continuityProof,
+   * );
+   * const receipt = await tx.wait();
+   * // Receipt contains the `TransactionVerified(chainKey, height, transactionIndex)` event log
+   * ```
+   */
+  public async verifyAndEmitSingle(
+    signer: Signer,
+    chainKey: number,
+    height: number,
+    encodedTransaction: string,
+    merkleProof: TransactionMerkleProof,
+    continuityProof: ContinuityProof,
+  ): Promise<ContractTransactionResponse> {
+    const contractWithSigner = this.blockProverContract.connect(signer) as Contract;
+    const method: ContractMethod = contractWithSigner.getFunction(VERIFY_AND_EMIT_SINGLE);
+
+    try {
+      return await method(chainKey, height, encodedTransaction, merkleProof, continuityProof);
+    } catch (error: any) {
+      console.error(`Error trying to verify and emit transaction: ${error.shortMessage}`);
       throw error;
     }
   }
