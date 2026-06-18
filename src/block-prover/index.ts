@@ -91,7 +91,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    *
    * @example
    * ```typescript
-   * const apiServerUrl = 'https://proof-gen-api.usc-testnet2.creditcoin.network';
+   * const apiServerUrl = 'https://proofbuilder.cc3-mainnet-usc.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
    * const proofResult = await proofBuilder.getProof(transactionHash);
    * expect(proofResult.success).toBe(true);
@@ -128,7 +128,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const apiServerUrl = 'https://proof-builder-api.usc-testnet2.creditcoin.network';
+   * const apiServerUrl = 'https://proofbuilder.cc3-mainnet-usc.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
    * const proofResult = await proofBuilder.getProof(transactionHash);
    * expect(proofResult.success).toBe(true);
@@ -231,7 +231,7 @@ export class PrecompileBlockProver implements BlockProvingProvider {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const apiServerUrl = 'https://proof-builder-api.usc-testnet2.creditcoin.network';
+   * const apiServerUrl = 'https://proofbuilder.cc3-mainnet-usc.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, apiServerUrl);
    * const transactionHashes = [
    *   '0xabc123...', // Example transaction hash 1

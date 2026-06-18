@@ -17,9 +17,9 @@ yarn add @gluwa/usc-sdk
 You have to define these values before executing them:
 
 - `CREDITCOIN_RPC_URL` - string - the URL to the Creditcoin chain,
-  for example `https://rpc.cc3-devnet.creditcoin.network`
+  for example `https://rpc.cc3-mainnet.creditcoin.network`
 - `CREDITCOIN_PROOF_BUILDER_URL` - string - the URL to the Creditcoin Proof Builder service,
-  for example `https://prover.cc3-devnet.creditcoin.network/`
+  for example `https://proofbuilder.cc3-mainnet-usc.creditcoin.network/`
 - `SOURCE_CHAIN_KEY` - number - unique identifier of the source chain, e.g. Ethereum,
   on the Creditcoin chain. NOTE: this is different than `chainId`!
 - `SOURCE_CHAIN_BLOCK_HEIGHT` - number - the block height on the source chain, e.g. Ethereum,
