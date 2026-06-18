@@ -117,7 +117,7 @@ export class ProofBuilder implements ProofProvider {
    * @example
    * ```typescript
    * const chainKey = 2; // Example chain key
-   * const builderUrl = 'https://proofbuilder.cc3-mainnet-usc.creditcoin.network';
+   * const builderUrl = 'https://prover.cc3-testnet.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
    * const proofResult = await proofBuilder.getProof(transactionHash);
    * // Results in:
@@ -164,7 +164,7 @@ export class ProofBuilder implements ProofProvider {
    * @example
    * ```typescript
    * const chainKey = 2;
-   * const builderUrl = 'https://proofbuilder.cc3-mainnet-usc.creditcoin.network';
+   * const builderUrl = 'https://prover.cc3-testnet.creditcoin.network';
    * const proofBuilder = new proofProvider.service.ProofBuilder(chainKey, builderUrl);
    * const batchProofResult = await proofBuilder.getBatchProof([transactionHash1, transactionHash2, transactionHash3]);
    * // Results in:
