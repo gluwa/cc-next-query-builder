@@ -9,7 +9,7 @@ const API_ATTESTED_HEIGHT_PATH = '/api/v1/attested-height';
 class ApiClient {
   private client: AxiosInstance;
 
-  constructor(baseURL: string, timeoutMs: number = 5000) {
+  constructor(baseURL: string, timeoutMs: number = 10000) {
     this.client = axios.create({
       baseURL,
       timeout: timeoutMs,
@@ -99,7 +99,7 @@ export class ProofBuilder implements ProofProvider {
 
   private chainKey: number;
 
-  constructor(chainKey: number, builderUrl: string, timeout: number = 5000) {
+  constructor(chainKey: number, builderUrl: string, timeout: number = 10000) {
     this.chainKey = chainKey;
     this.client = new ApiClient(builderUrl, timeout);
   }
