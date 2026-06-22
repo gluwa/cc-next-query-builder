@@ -126,11 +126,29 @@ export interface DecodedTransactionType4 {
 }
 
 export type DecodedTransaction =
-  | { type: 0; data: DecodedTransactionType0 }
-  | { type: 1; data: DecodedTransactionType1 }
-  | { type: 2; data: DecodedTransactionType2 }
-  | { type: 3; data: DecodedTransactionType3 }
-  | { type: 4; data: DecodedTransactionType4 };
+  | { type: 0; data: DecodedTransactionType0; gasUsed?: bigint }
+  | { type: 1; data: DecodedTransactionType1; gasUsed?: bigint }
+  | { type: 2; data: DecodedTransactionType2; gasUsed?: bigint }
+  | { type: 3; data: DecodedTransactionType3; gasUsed?: bigint }
+  | { type: 4; data: DecodedTransactionType4; gasUsed?: bigint };
+
+/**
+ * Options for {@link decodeEvmV1Transaction}.
+ */
+export interface DecodeOptions {
+  /**
+   * When true, the decoder will call `estimateGas` alongside each underlying
+   * eth_call (`getTransactionType`, `isValidTransactionType`, and the
+   * type-specific decoder), and accumulate the totals into
+   * {@link DecodedTransaction.gasUsed}. Defaults to false.
+   *
+   * NOTE: enabling this roughly doubles the number of RPC round-trips since
+   * each step issues a paired `estimateGas` request. The value/estimate pairs
+   * are dispatched in parallel so the wall-clock impact is closer to 1× than
+   * 2× when the RPC supports concurrent requests.
+   */
+  trackGas?: boolean;
+}
 
 function ensureHexPrefix(hex: string): string {
   if (!hex || typeof hex !== 'string') return '0x';
@@ -142,23 +160,47 @@ function ensureHexPrefix(hex: string): string {
  *
  * @param txBytes - Hex string of encoded transaction (with or without 0x prefix)
  * @param contract - The deployed EvmV1Decoder library contract
- * @returns Decoded transaction with type and full data structure
+ * @param opts - Optional behaviour flags; see {@link DecodeOptions}
+ * @returns Decoded transaction with type and full data structure. When
+ *          `opts.trackGas` is true the returned object also carries the
+ *          aggregate `gasUsed` (sum of estimateGas across all underlying
+ *          contract calls).
  */
-export async function decodeEvmV1Transaction(txBytes: string, contract: Contract): Promise<DecodedTransaction> {
+export async function decodeEvmV1Transaction(
+  txBytes: string,
+  contract: Contract,
+  opts: DecodeOptions = {},
+): Promise<DecodedTransaction> {
   const encodedBytes = ensureHexPrefix(txBytes);
   if (encodedBytes === '0x' || encodedBytes.length < 4) {
     throw new Error('EvmV1Decoder: Empty or invalid txBytes');
   }
 
+  const trackGas = opts.trackGas === true;
+  let gasUsed = BigInt(0);
+
+  // Helper: optionally pair a contract call with its estimateGas and
+  // accumulate the estimate into the running total. When tracking is off,
+  // behaviour is identical to the previous implementation (single eth_call).
+  const callTracked = async <T>(fnName: string, ...args: unknown[]): Promise<T> => {
+    if (!trackGas) {
+      return (await contract.getFunction(fnName)(...args)) as T;
+    }
+    const fn = contract.getFunction(fnName);
+    const [value, estimate] = await Promise.all([fn(...args), fn.estimateGas(...args)]);
+    gasUsed += BigInt(estimate);
+    return value as T;
+  };
+
   // 1. Get transaction type (first byte of encoding)
-  const txType = await contract.getTransactionType(encodedBytes);
+  const txType = await callTracked<bigint>('getTransactionType', encodedBytes);
   const typeNum = Number(txType);
 
   if (typeNum < 0 || typeNum > 4) {
     throw new Error(`EvmV1Decoder: Invalid transaction type ${typeNum}`);
   }
 
-  const isValid = await contract.isValidTransactionType(typeNum);
+  const isValid = await callTracked<boolean>('isValidTransactionType', typeNum);
   if (!isValid) {
     throw new Error(`EvmV1Decoder: Invalid transaction type ${typeNum}`);
   }
@@ -166,24 +208,24 @@ export async function decodeEvmV1Transaction(txBytes: string, contract: Contract
   // 2. Decode based on type
   switch (typeNum) {
     case 0: {
-      const result = await contract.decodeTransactionType0(encodedBytes);
-      return { type: 0, data: normalizeType0(result) };
+      const result = await callTracked<unknown>('decodeTransactionType0', encodedBytes);
+      return { type: 0, data: normalizeType0(result), ...(trackGas ? { gasUsed } : {}) };
     }
     case 1: {
-      const result = await contract.decodeTransactionType1(encodedBytes);
-      return { type: 1, data: normalizeType1(result) };
+      const result = await callTracked<unknown>('decodeTransactionType1', encodedBytes);
+      return { type: 1, data: normalizeType1(result), ...(trackGas ? { gasUsed } : {}) };
     }
     case 2: {
-      const result = await contract.decodeTransactionType2(encodedBytes);
-      return { type: 2, data: normalizeType2(result) };
+      const result = await callTracked<unknown>('decodeTransactionType2', encodedBytes);
+      return { type: 2, data: normalizeType2(result), ...(trackGas ? { gasUsed } : {}) };
     }
     case 3: {
-      const result = await contract.decodeTransactionType3(encodedBytes);
-      return { type: 3, data: normalizeType3(result) };
+      const result = await callTracked<unknown>('decodeTransactionType3', encodedBytes);
+      return { type: 3, data: normalizeType3(result), ...(trackGas ? { gasUsed } : {}) };
     }
     case 4: {
-      const result = await contract.decodeTransactionType4(encodedBytes);
-      return { type: 4, data: normalizeType4(result) };
+      const result = await callTracked<unknown>('decodeTransactionType4', encodedBytes);
+      return { type: 4, data: normalizeType4(result), ...(trackGas ? { gasUsed } : {}) };
     }
     default:
       throw new Error(`EvmV1Decoder: Unsupported transaction type ${typeNum}`);
