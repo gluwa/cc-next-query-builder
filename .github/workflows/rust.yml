@@ -19,7 +19,7 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Configure rustc version
         run: |
@@ -44,7 +44,7 @@ jobs:
   cargo-check:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Configure rustc version
         run: |
