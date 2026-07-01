@@ -13,7 +13,7 @@ jobs:
       release_tag: ${{ steps.testnet-env.outputs.release_tag }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Testnet ENV
         id: testnet-env
@@ -33,7 +33,7 @@ jobs:
           - chain_info.json
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Download ${{ matrix.artifact }} for release ${{ needs.setup.outputs.release_tag }}
         uses: i3h/download-release-asset@v1
