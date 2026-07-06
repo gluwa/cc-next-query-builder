@@ -142,15 +142,41 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
   });
 }
 
+/**
+ * Encode a single, fixed block then exit. Used to deterministically re-test
+ * alloy-vs-ethers encoding on the exact same block across both CI jobs, rather
+ * than racing live blocks that may not overlap between the two encoders.
+ */
+async function encodeSingleBlock(rpcUrl: string, pathToStoreJson: string, blockNumber: number): Promise<void> {
+  console.log(`=== encoding single block ${blockNumber} then exiting ...`);
+
+  mkdirSync(pathToStoreJson, { recursive: true });
+
+  const provider = new WebSocketProvider(rpcUrl);
+  try {
+    await blockHandler('block', provider, blockNumber, pathToStoreJson);
+  } finally {
+    await provider.destroy();
+  }
+}
+
 if (process.argv.length < 4) {
-  console.error('node dist/bin/encode-blocks.js <ws://ethRpcUrl> <pathToStoreJson>');
+  console.error('node dist/bin/encode-blocks.js <ws://ethRpcUrl> <pathToStoreJson> [targetBlockNumber]');
   process.exit(1);
 }
 
 const rpcUrl = process.argv[2] || 'ws://127.0.0.1:8545';
 const pathToStoreJson = process.argv[3];
+// Optional: when provided, encode exactly this one block and exit (deterministic
+// retest mode). When omitted, subscribe to live blocks for TIMEOUT_MINUTES.
+const targetBlockArg = process.argv[4];
 
-encodeBlocks(rpcUrl, pathToStoreJson).catch((reason) => {
+const run =
+  targetBlockArg !== undefined
+    ? encodeSingleBlock(rpcUrl, pathToStoreJson, parseInt(targetBlockArg, 10))
+    : encodeBlocks(rpcUrl, pathToStoreJson);
+
+run.catch((reason) => {
   console.error(reason);
   process.exit(1);
 });

@@ -25,6 +25,13 @@ pub struct CliArguments {
 
     #[arg(long, help = "Directory path to store JSON files", required = true)]
     pub path_to_store_json: String,
+
+    #[arg(
+        long,
+        help = "Optional: encode exactly this block number then exit (deterministic retest mode). \
+                When omitted, subscribe to live blocks for TIMEOUT_MINUTES."
+    )]
+    pub target_block: Option<u64>,
 }
 
 async fn encode_transaction(
@@ -214,6 +221,20 @@ async fn main() -> Result<()> {
     let provider = ProviderBuilder::new()
         .on_ws(WsConnect::new(args.eth_rpc_url))
         .await?;
+
+    // Deterministic retest mode: encode exactly one fixed block then exit. This
+    // lets both CI encoders (alloy + ethers) operate on the identical block
+    // instead of racing live blocks that may not overlap between the two jobs.
+    if let Some(block_number) = args.target_block {
+        println!("=== encoding single block {block_number} then exiting ...");
+        block_handler(
+            provider.clone(),
+            block_number,
+            args.path_to_store_json.clone(),
+        )
+        .await?;
+        return Ok(());
+    }
 
     let subscriber = provider.subscribe_blocks().await?;
     let mut stream = subscriber.into_stream();

@@ -19,6 +19,11 @@ concurrency:
 
 permissions: read-all
 
+env:
+  # DEBUG/retest: encode this exact block in both encoders so the comparison is
+  # deterministic (no live-block race between the alloy and ethers jobs).
+  RETEST_BLOCK: '25463089'
+
 jobs:
   setup:
     runs-on: ubuntu-24.04
@@ -65,13 +70,14 @@ jobs:
         run: |
           cargo build --release
 
-      - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
+      - name: Encode target block ${{ env.RETEST_BLOCK }}
         timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         working-directory: rust
         run: |
           ./target/release/encode-blocks \
             --eth-rpc-url wss://mainnet.infura.io/ws/v3/${{ secrets.INFURA_ETHEREUM_RPC_KEY }} \
-            --path-to-store-json /var/tmp/encoded-data/alloy/
+            --path-to-store-json /var/tmp/encoded-data/alloy/ \
+            --target-block "$RETEST_BLOCK"
         env:
           TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
@@ -114,12 +120,13 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
 
-      - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
+      - name: Encode target block ${{ env.RETEST_BLOCK }}
         timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         run: |
           node dist/bin/encode-blocks.js \
             wss://blockchain.googleapis.com/v1/projects/creditcoin-test/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${{ secrets.GOOGLE_ETHEREUM_RPC_KEY }} \
-            /var/tmp/encoded-data/ethers/
+            /var/tmp/encoded-data/ethers/ \
+            "$RETEST_BLOCK"
         env:
           TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
 
@@ -190,9 +197,9 @@ jobs:
           git status
 
           set -eo pipefail
-          # filter only modified content b/c between the 2 CI jobs we may not have
-          # encoded exactly the same set of blocks. Especially if cargo needs to
-          # recompile from scratch
+          # Both encoders were pointed at the SAME fixed block (${{ env.RETEST_BLOCK }}),
+          # so the modified-only filter now compares like-for-like tx files
+          # instead of racing potentially non-overlapping live blocks.
           git diff --diff-filter=M | colordiff
 
           # will exit non-zero in case of differences
