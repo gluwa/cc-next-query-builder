@@ -8,7 +8,7 @@ on:
 jobs:
   execute:
     name: check-format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     strategy:
       matrix:
