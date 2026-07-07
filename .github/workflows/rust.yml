@@ -17,7 +17,7 @@ permissions: read-all
 
 jobs:
   cargo-fmt:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
 
@@ -42,7 +42,7 @@ jobs:
           cargo fmt -- --check
 
   cargo-check:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
 

@@ -11,7 +11,7 @@ jobs:
   setup:
     outputs:
       release_tag: ${{ steps.testnet-env.outputs.release_tag }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
 
@@ -24,7 +24,7 @@ jobs:
   execute:
     needs:
       - setup
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:

@@ -17,7 +17,7 @@ permissions: read-all
 
 jobs:
   sanity-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       TAG_NAME: ${{ steps.identify-tag.outputs.TAG_NAME }}
     steps:
@@ -44,7 +44,7 @@ jobs:
           fi
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: sanity-check
     permissions:
       id-token: write
@@ -65,7 +65,7 @@ jobs:
       - run: npm publish --access public
 
   create-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs:
       - sanity-check
       - publish
