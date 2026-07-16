@@ -218,7 +218,7 @@ async fn main() -> Result<()> {
     let subscriber = provider.subscribe_blocks().await?;
     let mut stream = subscriber.into_stream();
     let mut last_seen_block: Option<u64> = None;
-    while let Some(block) = stream.next().await {
+    'outer: while let Some(block) = stream.next().await {
         if last_seen_block == Some(block.number) {
             println!(
                 "    skipping duplicate notification for block --- {:?}",
@@ -226,22 +226,31 @@ async fn main() -> Result<()> {
             );
             continue;
         }
-        last_seen_block = Some(block.number);
 
-        let _ = block_handler(
-            provider.clone(),
-            block.number,
-            args.path_to_store_json.clone(),
-        )
-        .await;
+        // Raw `newHeads` subscriptions only notify us of the latest head and do
+        // not backfill blocks that were mined while we were busy encoding the
+        // previous one. Walk the gap from the last block we processed up to the
+        // current head so every intermediate block is encoded, giving a near
+        // 1:1 mapping with the ethers encoder (which backfills the same way).
+        let from = last_seen_block.map_or(block.number, |last| last + 1);
+        for block_number in from..=block.number {
+            let _ = block_handler(
+                provider.clone(),
+                block_number,
+                args.path_to_store_json.clone(),
+            )
+            .await;
 
-        let current = start.elapsed()?;
-        if current.as_secs() >= timeout_minutes * 60 {
-            println!(
-                "=== {:?} mins timeout reached. exiting ...",
-                timeout_minutes
-            );
-            break;
+            last_seen_block = Some(block_number);
+
+            let current = start.elapsed()?;
+            if current.as_secs() >= timeout_minutes * 60 {
+                println!(
+                    "=== {:?} mins timeout reached. exiting ...",
+                    timeout_minutes
+                );
+                break 'outer;
+            }
         }
     }
 
