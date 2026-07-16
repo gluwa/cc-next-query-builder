@@ -122,24 +122,42 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
 
   const provider = new WebSocketProvider(rpcUrl);
 
-  // Fire the event whenever the block changes.
-  // We can also fire on 'safe' or 'finalized' blocks
-  provider.on('block', async (blockNumber) => {
-    try {
-      // cost: (80 + 160 * <txns in block>)
-      await blockHandler('block', provider, blockNumber, pathToStoreJson);
-    } catch (err) {
-      // A transient RPC error (e.g. `-32000 internal error` from the upstream
-      // provider) should not kill the whole run. Log it and move on to the
-      // next block — we'd rather skip one block than abort 60 minutes of work.
-      console.error(`!!! skipping block ${blockNumber} due to error:`, err);
-    }
-
-    if (Math.floor((Date.now() - start) / 60000) >= timeoutMinutes) {
+  // Keep the process alive for the full window with a standalone timer.
+  //
+  // Registering `provider.on('block', ...)` alone does NOT keep Node's event
+  // loop alive during the WebSocket connect handshake. If the top-level promise
+  // resolves before the socket delivers its first block, Node sees no pending
+  // work and exits 0 with an empty artifact. Wrapping everything in a promise
+  // that only resolves on this deadline guarantees we stay up for the whole
+  // window regardless of connect timing, and exit deterministically.
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
       console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
-      process.exit(0);
-    }
+      resolve();
+    }, timeoutMinutes * 60_000);
+
+    // Fire the event whenever the block changes.
+    // We can also fire on 'safe' or 'finalized' blocks
+    provider.on('block', async (blockNumber) => {
+      try {
+        // cost: (80 + 160 * <txns in block>)
+        await blockHandler('block', provider, blockNumber, pathToStoreJson);
+      } catch (err) {
+        // A transient RPC error (e.g. `-32000 internal error` from the upstream
+        // provider) should not kill the whole run. Log it and move on to the
+        // next block — we'd rather skip one block than abort 60 minutes of work.
+        console.error(`!!! skipping block ${blockNumber} due to error:`, err);
+      }
+
+      if (Math.floor((Date.now() - start) / 60000) >= timeoutMinutes) {
+        console.log(`=== ${timeoutMinutes} mins timeout reached. exiting ...`);
+        clearTimeout(timer);
+        resolve();
+      }
+    });
   });
+
+  await provider.destroy();
 }
 
 if (process.argv.length < 4) {

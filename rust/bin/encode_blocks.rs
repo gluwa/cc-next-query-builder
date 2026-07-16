@@ -12,7 +12,7 @@ use hex;
 use std::env;
 use std::fs;
 use std::str::FromStr;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use usc_abi_encoding::abi::abi_encode;
 use usc_abi_encoding::common::EncodingVersion;
@@ -218,30 +218,48 @@ async fn main() -> Result<()> {
     let subscriber = provider.subscribe_blocks().await?;
     let mut stream = subscriber.into_stream();
     let mut last_seen_block: Option<u64> = None;
-    while let Some(block) = stream.next().await {
-        if last_seen_block == Some(block.number) {
-            println!(
-                "    skipping duplicate notification for block --- {:?}",
-                block.number
-            );
-            continue;
-        }
-        last_seen_block = Some(block.number);
 
-        let _ = block_handler(
-            provider.clone(),
-            block.number,
-            args.path_to_store_json.clone(),
-        )
-        .await;
+    // Hard deadline independent of block delivery. A raw `newHeads` subscription
+    // can connect but never push a block (flaky WS handshake, silent stall),
+    // leaving `stream.next()` parked forever until the CI step is SIGKILLed.
+    // The `select!` below guarantees we exit gracefully at the deadline
+    // regardless of whether any block ever arrives.
+    let deadline = tokio::time::sleep(Duration::from_secs(timeout_minutes * 60));
+    tokio::pin!(deadline);
 
-        let current = start.elapsed()?;
-        if current.as_secs() >= timeout_minutes * 60 {
-            println!(
-                "=== {:?} mins timeout reached. exiting ...",
-                timeout_minutes
-            );
-            break;
+    loop {
+        tokio::select! {
+            () = &mut deadline => {
+                println!("=== {timeout_minutes:?} mins timeout reached. exiting ...");
+                break;
+            }
+            maybe_block = stream.next() => {
+                let Some(block) = maybe_block else {
+                    println!("=== block stream ended. exiting ...");
+                    break;
+                };
+
+                if last_seen_block == Some(block.number) {
+                    println!(
+                        "    skipping duplicate notification for block --- {:?}",
+                        block.number
+                    );
+                    continue;
+                }
+                last_seen_block = Some(block.number);
+
+                let _ = block_handler(
+                    provider.clone(),
+                    block.number,
+                    args.path_to_store_json.clone(),
+                )
+                .await;
+
+                if start.elapsed()?.as_secs() >= timeout_minutes * 60 {
+                    println!("=== {timeout_minutes:?} mins timeout reached. exiting ...");
+                    break;
+                }
+            }
         }
     }
 
