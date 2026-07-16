@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { Block, WebSocketProvider, TransactionReceipt } from 'ethers';
+import { Block, WebSocketProvider, TransactionReceipt, Network } from 'ethers';
 import { abiEncode } from '../encoding/abi';
 import { getTransactionWithRaw } from '../encoding';
 import { bytesInHexString } from '../utils/hex';
@@ -113,6 +113,22 @@ async function blockHandler(
   console.log(`<<< done encoding ${txHashes?.length} transactions in block ${blockNumber}`);
 }
 
+/**
+ * Derive a static ethers Network from a known RPC URL so we can skip network
+ * auto-detection. Returns undefined when the chain can't be inferred, in which
+ * case ethers falls back to its default auto-detection behaviour.
+ */
+function staticNetworkForRpc(rpcUrl: string): Network | undefined {
+  const url = rpcUrl.toLowerCase();
+  if (url.includes('sepolia')) {
+    return Network.from(11155111);
+  }
+  if (url.includes('mainnet') || url.includes('ethereum-mainnet')) {
+    return Network.from(1);
+  }
+  return undefined;
+}
+
 async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<void> {
   const start = Date.now();
   const timeoutMinutes = parseInt(process.env.TIMEOUT_MINUTES || '2');
@@ -120,7 +136,25 @@ async function encodeBlocks(rpcUrl: string, pathToStoreJson: string): Promise<vo
 
   mkdirSync(pathToStoreJson, { recursive: true });
 
-  const provider = new WebSocketProvider(rpcUrl);
+  // Skip network auto-detection by pinning a static network.
+  //
+  // ethers v6 performs an async network-detection round-trip over the WS before
+  // it starts its block-polling loop. On some endpoints (e.g. the Google
+  // Blockchain RPC) that handshake is slow/flaky, so within a short run window
+  // the poller sometimes never starts and zero blocks are delivered. Pinning
+  // the network lets block polling begin immediately after connect.
+  const network = staticNetworkForRpc(rpcUrl);
+  if (network !== undefined) {
+    console.log(`=== pinning static network: ${network.name} (chainId=${network.chainId})`);
+  } else {
+    console.log('=== no chain hint in RPC URL; falling back to network auto-detection');
+  }
+  const provider = new WebSocketProvider(rpcUrl, network, network ? { staticNetwork: network } : undefined);
+
+  // Surface WS-level failures instead of silently swallowing them.
+  provider.on('error', (err) => {
+    console.error('!!! provider error:', err);
+  });
 
   // Keep the process alive for the full window with a standalone timer.
   //
