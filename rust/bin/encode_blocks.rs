@@ -7,7 +7,6 @@ use alloy::{
 use anyhow::Result;
 use clap::Parser;
 use futures_util::StreamExt;
-use hex;
 
 use std::env;
 use std::fs;
@@ -64,7 +63,7 @@ async fn encode_transaction(
     let encoded_data = abi_encode(tx, rx, EncodingVersion::V1).unwrap();
     let as_str = hex::encode(encoded_data.abi());
 
-    Some(format!("0x{}", as_str))
+    Some(format!("0x{as_str}"))
 }
 
 async fn encode_and_write_to_disk(
@@ -83,7 +82,7 @@ async fn encode_and_write_to_disk(
 
     // <path>/<block_num>/<tx_hash>.txt
     fs::write(
-        format!("{}/{}/{}.txt", path, block_number, tx_hash.to_string()),
+        format!("{path}/{block_number}/{tx_hash}.txt"),
         encoded_data + "\n",
     )
     .unwrap();
@@ -94,9 +93,9 @@ async fn block_handler(
     block_number: u64,
     path_to_store_json: String,
 ) -> Result<()> {
-    println!("new block --- {:?}", block_number);
+    println!("new block --- {block_number:?}");
 
-    fs::create_dir_all(format!("{}/{}", path_to_store_json, block_number))?;
+    fs::create_dir_all(format!("{path_to_store_json}/{block_number}"))?;
 
     // Retry the block fetch up to 5 times with a 1s delay; the node may not
     // have the block indexed yet at the moment we get notified.
@@ -168,7 +167,6 @@ async fn block_handler(
         // loop over each transaction and fetch its receipt via explicit RPC call
         let tasks: Vec<_> = tx_hashes
             .clone()
-            .into_iter()
             .map(|tx_hash| {
                 tokio::spawn({
                     let prv = provider.clone();
@@ -207,7 +205,7 @@ async fn main() -> Result<()> {
 
     let start = SystemTime::now();
     let timeout_minutes: u64 = env::var("TIMEOUT_MINUTES").unwrap_or("2".into()).parse()?;
-    println!("=== starting with timeout {:?} mins ...", timeout_minutes);
+    println!("=== starting with timeout {timeout_minutes:?} mins ...");
 
     fs::create_dir_all(args.path_to_store_json.clone())?;
 
@@ -245,10 +243,7 @@ async fn main() -> Result<()> {
 
             let current = start.elapsed()?;
             if current.as_secs() >= timeout_minutes * 60 {
-                println!(
-                    "=== {:?} mins timeout reached. exiting ...",
-                    timeout_minutes
-                );
+                println!("=== {timeout_minutes:?} mins timeout reached. exiting ...");
                 break 'outer;
             }
         }
