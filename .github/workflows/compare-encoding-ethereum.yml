@@ -36,7 +36,7 @@ jobs:
         run: |
           # shellcheck disable=SC2129
           echo "timeout-minutes=60" >> "$GITHUB_OUTPUT"
-          echo "step-timeout=62" >> "$GITHUB_OUTPUT"
+          echo "step-timeout=65" >> "$GITHUB_OUTPUT"
 
   alloy-encode:
     needs:
