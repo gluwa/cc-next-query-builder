@@ -9,14 +9,40 @@ import EvmV1DecoderABI from '../utils/evmV1DecoderAbi.json';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Block gas threshold mirrored from gluwa/creditcoin3
+// cli/src/scripts/prover-check.ts (verifyProofs): fail if the gas with a
+// 10% safety margin reaches or exceeds 70% of the 75M block gas limit.
+//
+// IMPORTANT: unlike prover-check.ts, this check covers DECODE gas ONLY.
+// There is no verifyAndEmit()/on-chain verification call here, so the
+// margin is applied purely to the decode estimate (no gasForVerification
+// term). Kept as bigint math (11/10 and 7/10) to stay precise.
+const BLOCK_GAS_LIMIT = BigInt(75_000_000);
+const DECODE_GAS_THRESHOLD = (BLOCK_GAS_LIMIT * BigInt(7)) / BigInt(10);
+
 async function decodeFromDisk(pathToTxn: string, contract: Contract) {
   const encodedData = readFileSync(pathToTxn, {
     encoding: 'utf8',
     flag: 'r',
   }).trim();
 
-  const decoded = await decoder.decodeEvmV1Transaction(encodedData, contract);
-  console.log(`     decoded as type ${decoded.type}`);
+  const decoded = await decoder.decodeEvmV1Transaction(encodedData, contract, {
+    trackGas: true,
+  });
+  const decodeGas = decoded.gasUsed ?? BigInt(0);
+  console.log(`     decoded as type ${decoded.type}, decodeGas=${decodeGas}`);
+
+  // Apply a 10% safety margin to the DECODE gas only (no verifyAndEmit()
+  // call is made here) and reject if it crosses 70% of the block gas limit.
+  const decodeGasWithMargin = (decodeGas * BigInt(11)) / BigInt(10);
+  console.log(
+    `     decodeGasWithMargin (decode-only, +10%)=${decodeGasWithMargin} (threshold=${DECODE_GAS_THRESHOLD})`,
+  );
+  if (decodeGasWithMargin >= DECODE_GAS_THRESHOLD) {
+    throw new Error(
+      `decodeGasWithMargin ${decodeGasWithMargin} (decode-only, no verifyAndEmit) reaches or exceeds 70% of the ${BLOCK_GAS_LIMIT} block gas limit (${DECODE_GAS_THRESHOLD}); failing run (file=${pathToTxn})`,
+    );
+  }
 }
 
 async function decodeBlocks(creditcoinUrl: string, decoderLibraryAddress: string, pathToStore: string): Promise<void> {
