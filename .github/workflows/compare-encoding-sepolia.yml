@@ -226,6 +226,11 @@ jobs:
   decode-transactions:
     needs:
       - ethers-encode
+    # Run even if ethers-encode "failed" (e.g. the MAX_ENCODED_SIZE guard tripped).
+    # decode-transactions only consumes the uploaded encoded-by-ethers artifact,
+    # which is uploaded with `if: always()`, so it can still run and decode the
+    # blocks that were produced. !cancelled() keeps manual/cancel behaviour intact.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7

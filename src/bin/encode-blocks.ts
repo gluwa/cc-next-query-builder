@@ -66,7 +66,10 @@ async function encodeAndWriteToDisk(
 
   const encodedSize = bytesInHexString(encodedData);
   if (encodedSize > MAX_ENCODED_SIZE) {
-    throw new Error(
+    // Do NOT abort: we still want to encode and persist oversized blocks so the
+    // run continues. Log in the exact `encoded data exceeds MAX_ENCODED_SIZE`
+    // format so a downstream CI step can grep for it and fail the pipeline.
+    console.error(
       `encoded data exceeds MAX_ENCODED_SIZE: blockNumber=${blockNumber} txHash=${txHash} encodedSize=${encodedSize} bytes (max=${MAX_ENCODED_SIZE})`,
     );
   }
