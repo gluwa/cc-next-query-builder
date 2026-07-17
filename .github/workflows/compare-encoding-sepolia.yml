@@ -65,6 +65,12 @@ jobs:
         run: |
           cargo build --release
 
+      - name: DEBUG - Print runner IP address
+        run: |
+          # see https://opensource.com/article/18/5/how-find-ip-address-linux
+          IP_ADDRESS=$(curl https://ifconfig.me)
+          echo "INFO: IP_ADDRESS=$IP_ADDRESS"
+
       - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
         timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         working-directory: rust
@@ -113,6 +119,12 @@ jobs:
 
       - run: npm ci
       - run: npm run build --if-present
+
+      - name: DEBUG - Print runner IP address
+        run: |
+          # see https://opensource.com/article/18/5/how-find-ip-address-linux
+          IP_ADDRESS=$(curl https://ifconfig.me)
+          echo "INFO: IP_ADDRESS=$IP_ADDRESS"
 
       - name: Execute for ${{ needs.setup.outputs.timeout-minutes }} minutes
         timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
