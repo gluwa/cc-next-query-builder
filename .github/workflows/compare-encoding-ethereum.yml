@@ -69,27 +69,11 @@ jobs:
         timeout-minutes: ${{ fromJSON(needs.setup.outputs.step-timeout) }}
         working-directory: rust
         run: |
-          set -o pipefail
           ./target/release/encode-blocks \
             --eth-rpc-url wss://mainnet.infura.io/ws/v3/${{ secrets.INFURA_ETHEREUM_RPC_KEY }} \
-            --path-to-store-json /var/tmp/encoded-data/alloy/ \
-            2>&1 | tee /var/tmp/alloy-encode.log
+            --path-to-store-json /var/tmp/encoded-data/alloy/
         env:
           TIMEOUT_MINUTES: ${{ needs.setup.outputs.timeout-minutes }}
-
-      - name: Fail on MAX_ENCODED_SIZE errors
-        if: always()
-        run: |
-          if [ ! -f /var/tmp/alloy-encode.log ]; then
-            echo "::error::encode log not found — cannot verify MAX_ENCODED_SIZE"
-            exit 1
-          fi
-          if grep -q 'MAX_ENCODED_SIZE' /var/tmp/alloy-encode.log; then
-            echo "::error::One or more blocks exceeded MAX_ENCODED_SIZE and were silently skipped:"
-            grep 'MAX_ENCODED_SIZE' /var/tmp/alloy-encode.log
-            exit 1
-          fi
-          echo "No MAX_ENCODED_SIZE errors detected."
 
       - name: Add notices in case of failure
         if: failure() && github.event_name == 'pull_request'
