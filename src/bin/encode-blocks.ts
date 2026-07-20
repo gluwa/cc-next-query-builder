@@ -5,14 +5,14 @@ import { getTransactionWithRaw } from '../encoding';
 import { bytesInHexString } from '../utils/hex';
 
 // Maximum discovered size of ABI-encoded transaction data, in bytes.
-// Derived from the largest observed successfully-encoded transactions on mainnet,
-// which all topped out at exactly 449280 bytes of combined ABI-encoded data.
-// Reference: gluwa/usc-testnet-bridge-examples#77 — decode-testing/top_abi_size_transactions.csv
+// Derived from the largest observed successfully-encoded transactions on mainnet:
+//   block 25551628, tx 0x181611bff5f83dcf85cc45e06a453ee79a4ca1a697a1316030e655901c71bee8
+//   block 25551622, tx 0x296d83e8a0db263ad06422be8c6bd426c70785cc7c4f2b0b559eec5586e9da86
 //   block 25238768, tx 0x01ca130bf04e636d26ebdf0f6256a99894a6b474d4c016af74849c6a7572928d
 //   block 25238750, tx 0x343b91c47944693ed1cdf3c979bd7722ed9284320ff6069bcfd46c109d9c4199
 //   block 25238749, tx 0x5f60979ee18aba3f76122574e987f974fb1d7bacc372666f4b3f647236d54794
 //   block 25238746, tx 0xf2641f3bd13a111169c007205b3d1e7188201df3ae041991d2e1e3745ed1fb2d
-const MAX_ENCODED_SIZE = 449280;
+const MAX_ENCODED_SIZE = 503776;
 
 /**
  * Gets all transaction receipts for a given block using regular Infura/compatible RPC format.
