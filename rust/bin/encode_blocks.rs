@@ -1,7 +1,7 @@
 use alloy::{
     primitives::B256,
     providers::{Provider, ProviderBuilder, WsConnect},
-    rpc::types::{BlockTransactionsKind, TransactionReceipt},
+    rpc::types::TransactionReceipt,
 };
 
 use anyhow::Result;
@@ -105,7 +105,8 @@ async fn block_handler(
     let mut last_err: Option<anyhow::Error> = None;
     for attempt in 1..=MAX_ATTEMPTS {
         match provider
-            .get_block_by_number(block_number.into(), BlockTransactionsKind::Full)
+            .get_block_by_number(block_number.into())
+            .full()
             .await
         {
             Ok(Some(b)) => {
