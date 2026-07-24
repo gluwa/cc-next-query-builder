@@ -15,7 +15,6 @@ import { bytesInHexString } from '../utils/hex';
 //   block 25238746, tx 0xf2641f3bd13a111169c007205b3d1e7188201df3ae041991d2e1e3745ed1fb2d
 const MAX_ENCODED_SIZE = 530336;
 
-
 /**
  * Gets all transaction receipts for a given block using regular Infura/compatible RPC format.
  * Uses hexadecimal block number format (e.g., "0x1a2b3c").
