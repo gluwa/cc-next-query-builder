@@ -24,10 +24,22 @@ async function getProofForTxn(apiUrl: string, chainKey: number, txn: string) {
     if (
       axios.isAxiosError(error) &&
       error.response?.status === 422 &&
-      error.response?.data?.code === 'EmptyBlockTxProof'
+      (error.response?.data?.code === 'EmptyBlockTxProof' || error.response?.data?.code === 'BlockNotReady')
     ) {
       return null;
     }
+
+    // usually means block is within the source chain's reorg-protection window and is not yet confirmed.
+    // skip it b/c this workflow usually operates on latest blocks and we don't want to fail
+    // b/c of that
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 404 &&
+      error.response?.data?.code === 'BlockNotOnSourceChain'
+    ) {
+      return null;
+    }
+
     throw error;
   }
 }
@@ -64,7 +76,7 @@ async function decodeFromDisk(
       );
     gasForVerification = BigInt(estimate);
   }
-  console.log(`    ... gasForVerification=${gasForVerification}`);
+  console.log(`    ... gasForVerification=${gasForVerification} - 0 means skipped`);
 
   const encodedData = readFileSync(pathToTxn, {
     encoding: 'utf8',
