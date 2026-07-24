@@ -1,55 +1,111 @@
+import axios from 'axios';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { glob } from 'glob';
-import { Contract, WebSocketProvider } from 'ethers';
+import { BaseContract, Contract, Wallet, WebSocketProvider } from 'ethers';
 import type { InterfaceAbi } from 'ethers';
 import { abiEncode } from '../encoding/abi';
 import { getTransactionWithRaw } from '../encoding';
 import { decoder } from '../utils';
 import EvmV1DecoderABI from '../utils/evmV1DecoderAbi.json';
+import { blockProver, proofProvider } from '../';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Block gas threshold mirrored from gluwa/creditcoin3
-// cli/src/scripts/prover-check.ts (verifyProofs): fail if the gas with a
-// 10% safety margin reaches or exceeds 70% of the 75M block gas limit.
-//
-// IMPORTANT: unlike prover-check.ts, this check covers DECODE gas ONLY.
-// There is no verifyAndEmit()/on-chain verification call here, so the
-// margin is applied purely to the decode estimate (no gasForVerification
-// term). Kept as bigint math (11/10 and 7/10) to stay precise.
-const BLOCK_GAS_LIMIT = BigInt(75_000_000);
-const DECODE_GAS_THRESHOLD = (BLOCK_GAS_LIMIT * BigInt(7)) / BigInt(10);
+async function getProofForTxn(apiUrl: string, chainKey: number, txn: string) {
+  const url = `${apiUrl}/api/v1/proof-by-tx/${chainKey}/${txn}`;
+  try {
+    // NOTE: throws an exception in case of errors
+    return await axios.get(url);
+  } catch (error) {
+    // The prover returns HTTP 422 with code 'EmptyBlockTxProof' for blocks
+    // that contain no transactions; there is no tx proof to verify, so we
+    // treat this as a skip rather than a hard failure. Any other error is
+    // re-thrown so genuine problems still surface and fail the run.
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 422 &&
+      error.response?.data?.code === 'EmptyBlockTxProof'
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
 
-async function decodeFromDisk(pathToTxn: string, contract: Contract) {
+async function decodeFromDisk(
+  pathToTxn: string,
+  decodeContract: Contract,
+  proverPrecompileWithSigner: BaseContract,
+  proverBaseUrl: string,
+  chainKey: number,
+) {
+  const verifyAndEmitSingleFragment =
+    'verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
+
+  const pathComponents = pathToTxn.replace('.txt', '').split('/');
+  const txHash = pathComponents[pathComponents.length - 1];
+
+  console.log(`... get proof for source txn ${txHash}`);
+  await sleep(500); // rate-limit
+
+  let gasForVerification = 0n;
+  const response = await getProofForTxn(proverBaseUrl, chainKey, txHash);
+  if (response !== null) {
+    const proofData = response.data as proofProvider.ContinuityResponse;
+
+    const estimate = await proverPrecompileWithSigner
+      .getFunction(verifyAndEmitSingleFragment)
+      .estimateGas(
+        proofData.chainKey,
+        proofData.headerNumber,
+        proofData.txBytes,
+        proofData.merkleProof,
+        proofData.continuityProof,
+      );
+    gasForVerification = BigInt(estimate);
+  }
+  console.log(`    ... gasForVerification=${gasForVerification}`);
+
   const encodedData = readFileSync(pathToTxn, {
     encoding: 'utf8',
     flag: 'r',
   }).trim();
 
-  const decoded = await decoder.decodeEvmV1Transaction(encodedData, contract, {
+  const decoded = await decoder.decodeEvmV1Transaction(encodedData, decodeContract, {
     trackGas: true,
   });
-  const decodeGas = decoded.gasUsed ?? BigInt(0);
-  console.log(`     decoded as type ${decoded.type}, decodeGas=${decodeGas}`);
+  const gasForDecoding = decoded.gasUsed ?? BigInt(0);
+  console.log(`     decoded as type ${decoded.type}, gasForDecoding=${gasForDecoding}`);
 
-  // Apply a 10% safety margin to the DECODE gas only (no verifyAndEmit()
-  // call is made here) and reject if it crosses 70% of the block gas limit.
-  const decodeGasWithMargin = (decodeGas * BigInt(11)) / BigInt(10);
-  console.log(
-    `     decodeGasWithMargin (decode-only, +10%)=${decodeGasWithMargin} (threshold=${DECODE_GAS_THRESHOLD})`,
-  );
-  if (decodeGasWithMargin >= DECODE_GAS_THRESHOLD) {
+  // Add a 10% safety margin to the raw estimates and reject if the
+  // combined cost crosses 70% of the 75M block gas limit. Using bigint
+  // math (11/10 and 7/10) keeps the value precise and consistent with
+  // the rest of the script. The 70% threshold is an explicit decision;
+  // see commit log + linked Slack thread for context.
+  const totalGas = ((gasForVerification + gasForDecoding) * 11n) / 10n;
+  const blockGasLimit = 75_000_000n;
+  const totalGasThreshold = (blockGasLimit * 7n) / 10n;
+  console.log(`    ... totalGas (with 10% margin)=${totalGas} (threshold=${totalGasThreshold})`);
+  if (totalGas >= totalGasThreshold) {
     throw new Error(
-      `decodeGasWithMargin ${decodeGasWithMargin} (decode-only, no verifyAndEmit) reaches or exceeds 70% of the ${BLOCK_GAS_LIMIT} block gas limit (${DECODE_GAS_THRESHOLD}); failing run (file=${pathToTxn})`,
+      `totalGas ${totalGas} reaches or exceeds 70% of the ${blockGasLimit} block gas limit (${totalGasThreshold}); failing run`,
     );
   }
 }
 
-async function decodeBlocks(creditcoinUrl: string, decoderLibraryAddress: string, pathToStore: string): Promise<void> {
-  const contract = new Contract(
-    decoderLibraryAddress,
-    EvmV1DecoderABI as InterfaceAbi,
-    new WebSocketProvider(creditcoinUrl),
+async function decodeBlocks(
+  creditcoinUrl: string,
+  proverUrl: string,
+  decoderLibraryAddress: string,
+  pathToStore: string,
+  chainKey: number,
+): Promise<void> {
+  const creditcoinWs = new WebSocketProvider(creditcoinUrl);
+  const decodeContract = new Contract(decoderLibraryAddress, EvmV1DecoderABI as InterfaceAbi, creditcoinWs);
+
+  const proverPrecompile = new blockProver.PrecompileBlockProver(creditcoinWs);
+  const proverPrecompileWithSigner = proverPrecompile.blockProverContract.connect(
+    Wallet.createRandom().connect(creditcoinWs),
   );
 
   const txnFiles = await glob('*/**.txt', { cwd: pathToStore, absolute: true });
@@ -63,7 +119,7 @@ async function decodeBlocks(creditcoinUrl: string, decoderLibraryAddress: string
 
   for (const [idx, txFile] of txnFiles.entries()) {
     console.log(`>>>> ${idx}/${numFiles} decoding ${txFile}`);
-    await decodeFromDisk(txFile, contract);
+    await decodeFromDisk(txFile, decodeContract, proverPrecompileWithSigner, proverUrl, chainKey);
     // await sleep(50); // rate-limit ourselves
   }
   console.log(`DONE`);
@@ -76,10 +132,12 @@ if (process.argv.length < 5) {
 }
 
 const rpcUrl = process.argv[2] || 'ws://127.0.0.1:9944';
-const evmV1DecoderAddress = process.argv[3];
-const pathToStore = process.argv[4];
+const proverUrl = process.argv[3];
+const evmV1DecoderAddress = process.argv[4];
+const pathToStore = process.argv[5];
+const chainKey = parseInt(process.argv[6]);
 
-decodeBlocks(rpcUrl, evmV1DecoderAddress, pathToStore).catch((reason) => {
+decodeBlocks(rpcUrl, proverUrl, evmV1DecoderAddress, pathToStore, chainKey).catch((reason) => {
   console.error(reason);
   process.exit(1);
 });

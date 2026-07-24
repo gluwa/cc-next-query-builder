@@ -264,8 +264,11 @@ jobs:
       - name: Decode transactions
         run: |
           node dist/bin/decode-blocks.js \
-            wss://rpc.cc3-devnet.creditcoin.network 0xf882f3a71A36E29E86615B7055f42A68D7E4cfBB \
-            /var/tmp/encoded-data/
+            wss://rpc.cc3-devnet.creditcoin.network \
+            https://prover.cc3-devnet.creditcoin.network \
+            0xf882f3a71A36E29E86615B7055f42A68D7E4cfBB \
+            /var/tmp/encoded-data/ \
+            1
 
       - name: Report result to Slack
         if: always()
