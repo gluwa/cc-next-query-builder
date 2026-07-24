@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-26.04
     outputs:
       # vvv how long to keep encoding blocks
-      timeout-minutes: ${{ steps.cron-env.outputs.timeout-minutes || 2 }}
-      step-timeout: ${{ steps.cron-env.outputs.step-timeout || 5 }}
+      timeout-minutes: ${{ steps.cron-env.outputs.timeout-minutes || 1 }}
+      step-timeout: ${{ steps.cron-env.outputs.step-timeout || 3 }}
       # ^^^ how long to wait for the encoding-blocks program to exit
       # WARNING: must be greater than the value of `timeout-minutes`
 
