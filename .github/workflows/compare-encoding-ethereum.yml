@@ -2,13 +2,10 @@
 name: compare-encoding-ethereum
 
 'on':
-  pull_request:
-    paths:
-      - '**.rs'
-      - '**.ts'
-      - '**Cargo**'
-      - '**package*.json'
-      - '.github/workflows/compare-encoding-*.yml'
+  # NOTE: pull_request trigger intentionally disabled on this branch. The new
+  # compare-encoding-largest-txns workflow covers PR-time encode/decode
+  # verification; running the full mainnet stream encode on every PR here is
+  # redundant + slow. Still runs on schedule and can be triggered manually.
   schedule:
     - cron: '12 */12 * * *'
   workflow_dispatch:
