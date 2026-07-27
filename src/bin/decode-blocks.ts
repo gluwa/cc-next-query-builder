@@ -78,6 +78,17 @@ async function decodeFromDisk(
   }
   console.log(`    ... gasForVerification=${gasForVerification} - 0 means skipped`);
 
+  // Reject any single transaction whose individual gas cost crosses the
+  // per-transaction cap. A single tx must fit comfortably within a block
+  // on its own, so each estimate is checked against singleTxnGasLimit as
+  // soon as it becomes available.
+  const singleTxnGasLimit = 25_000_000n;
+  if (gasForVerification >= singleTxnGasLimit) {
+    throw new Error(
+      `gasForVerification ${gasForVerification} reaches or exceeds the single transaction gas limit (${singleTxnGasLimit}); failing run`,
+    );
+  }
+
   const encodedData = readFileSync(pathToTxn, {
     encoding: 'utf8',
     flag: 'r',
@@ -88,6 +99,11 @@ async function decodeFromDisk(
   });
   const gasForDecoding = decoded.gasUsed ?? BigInt(0);
   console.log(`     decoded as type ${decoded.type}, gasForDecoding=${gasForDecoding}`);
+  if (gasForDecoding >= singleTxnGasLimit) {
+    throw new Error(
+      `gasForDecoding ${gasForDecoding} reaches or exceeds the single transaction gas limit (${singleTxnGasLimit}); failing run`,
+    );
+  }
 
   // Add a 10% safety margin to the raw estimates and reject if the
   // combined cost crosses 70% of the 75M block gas limit. Using bigint
@@ -98,6 +114,11 @@ async function decodeFromDisk(
   const blockGasLimit = 75_000_000n;
   const totalGasThreshold = (blockGasLimit * 7n) / 10n;
   console.log(`    ... totalGas (with 10% margin)=${totalGas} (threshold=${totalGasThreshold})`);
+  if (totalGas >= singleTxnGasLimit) {
+    throw new Error(
+      `totalGas ${totalGas} reaches or exceeds the single transaction gas limit (${singleTxnGasLimit}); failing run`,
+    );
+  }
   if (totalGas >= totalGasThreshold) {
     throw new Error(
       `totalGas ${totalGas} reaches or exceeds 70% of the ${blockGasLimit} block gas limit (${totalGasThreshold}); failing run`,
