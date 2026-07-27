@@ -11,6 +11,10 @@ version = "0.1.0"
 name = "encode-blocks"
 path = "bin/encode_blocks.rs"
 
+[[bin]]
+name = "encode-largest-txns"
+path = "bin/encode_largest_txns.rs"
+
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.6.1", features = ["derive"] }
