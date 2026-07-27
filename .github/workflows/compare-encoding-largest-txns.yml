@@ -129,12 +129,33 @@ jobs:
       - name: Decode transactions
         timeout-minutes: 5
         run: |
+          set -o pipefail
           node dist/bin/decode-blocks.js \
             wss://rpc.cc3-devnet.creditcoin.network \
             https://prover.cc3-devnet.creditcoin.network \
             0xf882f3a71A36E29E86615B7055f42A68D7E4cfBB \
             /var/tmp/encoded-data/ \
-            4
+            4 \
+            2>&1 | tee /var/tmp/ethers-decode.log
+
+      - name: Fail on decode errors
+        if: always()
+        run: |
+          if [ ! -f /var/tmp/ethers-decode.log ]; then
+            echo "::error::decode log not found — cannot verify results"
+            exit 1
+          fi
+
+          # decode-blocks no longer throws on a gas-cap violation: it logs each
+          # one with a DECODE_ERROR: prefix so all failing large txns surface in
+          # a single run. Grep here and fail the pipeline once, after every txn
+          # has been decoded.
+          if grep -q 'DECODE_ERROR' /var/tmp/ethers-decode.log; then
+            echo "::error::One or more largest txns exceeded a gas cap during decode:"
+            grep 'DECODE_ERROR' /var/tmp/ethers-decode.log
+            exit 1
+          fi
+          echo "No decode errors detected."
 
       - name: Report result to Slack
         if: always()
