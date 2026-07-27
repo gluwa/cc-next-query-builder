@@ -20,69 +20,6 @@ concurrency:
 permissions: read-all
 
 jobs:
-  alloy-encode:
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Configure rustc version
-        run: |
-          RUSTC_VERSION=$(grep channel rust/rust-toolchain.toml | tail -n1 | tr -d " " | cut -f2 -d'"')
-          echo "RUSTC_VERSION=$RUSTC_VERSION" >> "$GITHUB_ENV"
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUSTC_VERSION }}
-          targets: wasm32-unknown-unknown
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
-
-      - name: Build
-        working-directory: rust
-        run: |
-          cargo build --release --bin encode-largest-txns
-
-      - name: DEBUG - Print runner IP address
-        run: |
-          # see https://opensource.com/article/18/5/how-find-ip-address-linux
-          IP_ADDRESS=$(curl https://ifconfig.me)
-          echo "INFO: IP_ADDRESS=$IP_ADDRESS"
-
-      - name: Encode the 8 largest mainnet transactions
-        timeout-minutes: 5
-        working-directory: rust
-        run: |
-          ./target/release/encode-largest-txns \
-            --eth-rpc-url wss://mainnet.infura.io/ws/v3/${{ secrets.INFURA_ETHEREUM_RPC_KEY }} \
-            --path-to-store-json /var/tmp/encoded-data/alloy/
-
-      - name: Add notices in case of failure
-        if: failure() && github.event_name == 'pull_request'
-        run: |
-          # note: GitHub appears to display these in reverse order
-          echo "::notice::SUGGESTION: Trigger this workflow manually against the same branch to verify the changes."
-          echo "::notice::IMPORTANT:  Secret credentials may be missing for PRs from Dependabot!"
-
-      - name: Report result to Slack
-        if: failure() && github.event_name == 'schedule'
-        uses: act10ns/slack@v2
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-          channel: '#protocol-internal'
-          message: 'Alloy encode (largest txns) failed! cc <@U028EMRHS3S>'
-
-      - name: Upload encoded data
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: encoded-by-alloy-largest
-          path: /var/tmp/encoded-data/alloy
-          include-hidden-files: true
-
   ethers-encode:
     runs-on: ubuntu-26.04
     steps:
@@ -107,23 +44,36 @@ jobs:
         run: |
           set -o pipefail
           node dist/bin/encode-largest-txns.js \
-            wss://blockchain.googleapis.com/v1/projects/creditcoin-test/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${{ secrets.GOOGLE_ETHEREUM_RPC_KEY }} \
+            wss://blockchain.googleapis.com/v1/projects/creditcoin-test/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=*** secrets.GOOGLE_ETHEREUM_RPC_KEY }} \
             /var/tmp/encoded-data/ethers/ \
             2>&1 | tee /var/tmp/ethers-encode.log
 
-      - name: Fail on MAX_ENCODED_SIZE errors
+      - name: Fail on encode errors or MAX_ENCODED_SIZE
         if: always()
         run: |
           if [ ! -f /var/tmp/ethers-encode.log ]; then
-            echo "::error::encode log not found — cannot verify MAX_ENCODED_SIZE"
+            echo "::error::encode log not found — cannot verify results"
             exit 1
+          fi
+
+          # The encoder never throws: it logs every failure so all 8 fixtures
+          # get attempted in one run. Grep for both failure markers here and
+          # fail the pipeline once, after everything has been attempted.
+          FAILED=0
+          if grep -q 'ENCODE_ERROR' /var/tmp/ethers-encode.log; then
+            echo "::error::One or more largest txns failed to encode:"
+            grep 'ENCODE_ERROR' /var/tmp/ethers-encode.log
+            FAILED=1
           fi
           if grep -q 'MAX_ENCODED_SIZE' /var/tmp/ethers-encode.log; then
-            echo "::error::One or more transactions exceeded MAX_ENCODED_SIZE and were silently skipped:"
+            echo "::error::One or more transactions exceeded MAX_ENCODED_SIZE:"
             grep 'MAX_ENCODED_SIZE' /var/tmp/ethers-encode.log
+            FAILED=1
+          fi
+          if [ "$FAILED" -ne 0 ]; then
             exit 1
           fi
-          echo "No MAX_ENCODED_SIZE errors detected."
+          echo "No encode errors detected."
 
       - name: Add notices in case of failure
         if: failure() && github.event_name == 'pull_request'
@@ -149,71 +99,14 @@ jobs:
           path: /var/tmp/encoded-data/ethers
           include-hidden-files: true
 
-  compare-data:
-    needs:
-      - alloy-encode
-      - ethers-encode
-    runs-on: ubuntu-26.04
-    steps:
-      - name: Setup
-        run: |
-          sudo apt-get install colordiff unzip
-
-      - name: Download encoded data from alloy
-        uses: actions/download-artifact@v8
-        with:
-          path: /var/tmp/encoded-data
-          pattern: encoded-by-alloy-largest
-
-      - name: Git commit alloy data
-        working-directory: /var/tmp/encoded-data
-        run: |
-          git config --global init.defaultBranch main
-          git config --global user.email "creditcoin@gluwa.com"
-          git config --global user.name "gluwa-bot"
-
-          git init
-          git add .
-          git commit -a -m "Import data encoded by alloy"
-
-          # remove everything b/c next we'll import the data from ethers encoding
-          rm -rf *
-
-      - name: Download encoded data from ethers
-        uses: actions/download-artifact@v8
-        with:
-          path: /var/tmp/encoded-data
-          pattern: encoded-by-ethers-largest
-
-      - name: Compare
-        working-directory: /var/tmp/encoded-data
-        timeout-minutes: 5
-        run: |
-          git status
-
-          set -eo pipefail
-          git diff | colordiff
-
-          # will exit non-zero in case of differences
-          git diff --quiet
-
-      - name: Report result to Slack
-        if: always()
-        uses: act10ns/slack@v2
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-          channel: '#protocol-internal'
-          message: 'Encoding diff (largest txns) complete! cc <@U028EMRHS3S>'
-
   decode-transactions:
     needs:
       - ethers-encode
-    # Run even if ethers-encode "failed" (e.g. the MAX_ENCODED_SIZE guard tripped).
-    # decode-transactions only consumes the uploaded encoded-by-ethers-largest
-    # artifact, which is uploaded with `if: always()`, so it can still run and
-    # decode the transactions that were produced. !cancelled() keeps
-    # manual/cancel behaviour intact.
+    # Run even if ethers-encode "failed" (e.g. the encode-error/MAX_ENCODED_SIZE
+    # guard tripped). decode-transactions only consumes the uploaded
+    # encoded-by-ethers-largest artifact, which is uploaded with `if: always()`,
+    # so it can still run and decode the transactions that were produced.
+    # !cancelled() keeps manual/cancel behaviour intact.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     steps:

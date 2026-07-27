@@ -38,11 +38,12 @@ async function encodeTransaction(
   provider: WebSocketProvider,
   txHash: string,
   receipt: TransactionReceipt | null,
-): Promise<string> {
+): Promise<string | null> {
   // 80 credits
   const transaction = await getTransactionWithRaw(provider, txHash);
   if (transaction === null) {
-    throw new Error(`transaction ${txHash} not found via RPC`);
+    console.error(`ENCODE_ERROR: transaction ${txHash} not found via RPC`);
+    return null;
   }
 
   if (receipt === null) {
@@ -50,7 +51,8 @@ async function encodeTransaction(
     receipt = await provider.getTransactionReceipt(txHash);
   }
   if (receipt === null) {
-    throw new Error(`receipt for ${txHash} not found via RPC`);
+    console.error(`ENCODE_ERROR: receipt for ${txHash} not found via RPC`);
+    return null;
   }
 
   const encodedData = abiEncode(transaction, receipt);
@@ -63,14 +65,25 @@ async function encodeAndWriteToDisk(
   blockNumber: number,
   txHash: string,
 ): Promise<void> {
-  const encodedData = await encodeTransaction(provider, txHash, null);
+  // Do NOT throw on failure: these are 8 independent worst-case fixtures and we
+  // want to see EVERY one that fails in a single run, not bail on the first.
+  // Errors are logged with the `ENCODE_ERROR:` prefix so a downstream CI step
+  // can grep for them and fail the pipeline after all txns are attempted.
+  let encodedData: string | null;
+  try {
+    encodedData = await encodeTransaction(provider, txHash, null);
+  } catch (err) {
+    console.error(`ENCODE_ERROR: blockNumber=${blockNumber} txHash=${txHash} threw: ${err}`);
+    return;
+  }
+  if (encodedData === null) {
+    return;
+  }
 
   const encodedSize = bytesInHexString(encodedData);
   if (encodedSize > MAX_ENCODED_SIZE) {
-    // Do NOT abort: we still want to encode and persist oversized transactions
-    // so the run continues. Log in the exact `encoded data exceeds
-    // MAX_ENCODED_SIZE` format so a downstream CI step can grep for it and fail
-    // the pipeline.
+    // Log in the exact `encoded data exceeds MAX_ENCODED_SIZE` format so a
+    // downstream CI step can grep for it and fail the pipeline.
     console.error(
       `encoded data exceeds MAX_ENCODED_SIZE: blockNumber=${blockNumber} txHash=${txHash} encodedSize=${encodedSize} bytes (max=${MAX_ENCODED_SIZE})`,
     );
@@ -90,10 +103,10 @@ async function encodeLargestTxns(rpcUrl: string, pathToStoreJson: string): Promi
   const provider = new WebSocketProvider(rpcUrl);
 
   try {
-    // Encode each documented transaction directly by hash. We fail the whole
-    // run on any error: unlike the streaming encoder (which skips transient
-    // failures on live blocks), these are fixed historical fixtures and must
-    // always be retrievable/encodable.
+    // Encode each documented transaction directly by hash. We deliberately do
+    // NOT abort on the first failure: every txn is attempted so all failures
+    // surface in one run. Any failure is logged with `ENCODE_ERROR:` for a
+    // downstream grep-based CI gate.
     for (const { blockNumber, txHash } of LARGEST_MAINNET_TXNS) {
       console.log(`--- encoding block ${blockNumber} txn ${txHash}`);
       await encodeAndWriteToDisk(pathToStoreJson, provider, blockNumber, txHash);
