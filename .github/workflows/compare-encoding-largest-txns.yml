@@ -41,9 +41,11 @@ jobs:
 
       - name: Encode the 8 largest mainnet transactions
         timeout-minutes: 5
+        env:
+          ENCODE_LARGEST_TXNS: '1'
         run: |
           set -o pipefail
-          node dist/bin/encode-largest-txns.js \
+          node dist/bin/encode-blocks.js \
             wss://blockchain.googleapis.com/v1/projects/creditcoin-test/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${{ secrets.GOOGLE_ETHEREUM_RPC_KEY }} \
             /var/tmp/encoded-data/ethers/ \
             2>&1 | tee /var/tmp/ethers-encode.log
