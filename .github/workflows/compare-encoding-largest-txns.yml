@@ -44,7 +44,7 @@ jobs:
         run: |
           set -o pipefail
           node dist/bin/encode-largest-txns.js \
-            wss://blockchain.googleapis.com/v1/projects/creditcoin-test/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=*** secrets.GOOGLE_ETHEREUM_RPC_KEY }} \
+            wss://blockchain.googleapis.com/v1/projects/creditcoin-test/locations/us-central1/endpoints/ethereum-mainnet/rpc?key=${{ secrets.GOOGLE_ETHEREUM_RPC_KEY }} \
             /var/tmp/encoded-data/ethers/ \
             2>&1 | tee /var/tmp/ethers-encode.log
 
