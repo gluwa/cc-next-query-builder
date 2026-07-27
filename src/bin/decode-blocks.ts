@@ -89,7 +89,7 @@ async function decodeFromDisk(
   // first. A downstream grep-based CI gate fails the pipeline afterwards.
   const singleTxnGasLimit = 25_000_000n;
   if (gasForVerification >= singleTxnGasLimit) {
-    console.error(
+    console.log(
       `DECODE_ERROR: ${txHash} gasForVerification ${gasForVerification} reaches or exceeds the single transaction gas limit (${singleTxnGasLimit})`,
     );
   }
@@ -105,7 +105,7 @@ async function decodeFromDisk(
   const gasForDecoding = decoded.gasUsed ?? BigInt(0);
   console.log(`     decoded as type ${decoded.type}, gasForDecoding=${gasForDecoding}`);
   if (gasForDecoding >= singleTxnGasLimit) {
-    console.error(
+    console.log(
       `DECODE_ERROR: ${txHash} gasForDecoding ${gasForDecoding} reaches or exceeds the single transaction gas limit (${singleTxnGasLimit})`,
     );
   }
@@ -120,12 +120,12 @@ async function decodeFromDisk(
   const totalGasThreshold = (blockGasLimit * 7n) / 10n;
   console.log(`    ... totalGas (with 10% margin)=${totalGas} (threshold=${totalGasThreshold})`);
   if (totalGas >= singleTxnGasLimit) {
-    console.error(
+    console.log(
       `DECODE_ERROR: ${txHash} totalGas ${totalGas} reaches or exceeds the single transaction gas limit (${singleTxnGasLimit})`,
     );
   }
   if (totalGas >= totalGasThreshold) {
-    console.error(
+    console.log(
       `DECODE_ERROR: ${txHash} totalGas ${totalGas} reaches or exceeds 70% of the ${blockGasLimit} block gas limit (${totalGasThreshold})`,
     );
   }

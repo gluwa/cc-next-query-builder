@@ -42,7 +42,7 @@ async function encodeTransaction(
   // 80 credits
   const transaction = await getTransactionWithRaw(provider, txHash);
   if (transaction === null) {
-    console.error(`ENCODE_ERROR: transaction ${txHash} not found via RPC`);
+    console.log(`ENCODE_ERROR: transaction ${txHash} not found via RPC`);
     return null;
   }
 
@@ -51,7 +51,7 @@ async function encodeTransaction(
     receipt = await provider.getTransactionReceipt(txHash);
   }
   if (receipt === null) {
-    console.error(`ENCODE_ERROR: receipt for ${txHash} not found via RPC`);
+    console.log(`ENCODE_ERROR: receipt for ${txHash} not found via RPC`);
     return null;
   }
 
@@ -73,7 +73,7 @@ async function encodeAndWriteToDisk(
   try {
     encodedData = await encodeTransaction(provider, txHash, null);
   } catch (err) {
-    console.error(`ENCODE_ERROR: blockNumber=${blockNumber} txHash=${txHash} threw: ${err}`);
+    console.log(`ENCODE_ERROR: blockNumber=${blockNumber} txHash=${txHash} threw: ${err}`);
     return;
   }
   if (encodedData === null) {
@@ -84,7 +84,7 @@ async function encodeAndWriteToDisk(
   if (encodedSize > MAX_ENCODED_SIZE) {
     // Log in the exact `encoded data exceeds MAX_ENCODED_SIZE` format so a
     // downstream CI step can grep for it and fail the pipeline.
-    console.error(
+    console.log(
       `encoded data exceeds MAX_ENCODED_SIZE: blockNumber=${blockNumber} txHash=${txHash} encodedSize=${encodedSize} bytes (max=${MAX_ENCODED_SIZE})`,
     );
   }
