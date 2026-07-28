@@ -6,7 +6,8 @@ import { bytesInHexString } from '../utils/hex';
 
 // Maximum discovered size of ABI-encoded transaction data, in bytes.
 // Derived from the largest observed successfully-encoded transactions on mainnet:
-//   block 25551628, tx 0x181611bff5f83dcf85cc45e06a453ee79a4ca1a697a1316030e655901c71bee8
+//   block 25631442, tx 0xb4548765a21c0aad6742e6198b4b28c6e42f896c9419890d0f4b67766d63e7c6 (encodedSize=530336)
+//   block 25551628, tx 0x181611bff5f83dcf85cc45e06a453ee79a4ca1a697a1316030e655901c71bee8 <- MAX_ENCODED_SIZE (503776, largest that fits)
 //   block 25551622, tx 0x296d83e8a0db263ad06422be8c6bd426c70785cc7c4f2b0b559eec5586e9da86
 //   block 25238768, tx 0x01ca130bf04e636d26ebdf0f6256a99894a6b474d4c016af74849c6a7572928d
 //   block 25238750, tx 0x343b91c47944693ed1cdf3c979bd7722ed9284320ff6069bcfd46c109d9c4199
