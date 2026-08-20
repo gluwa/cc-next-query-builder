@@ -35,8 +35,8 @@ jobs:
         if: github.event_name == 'schedule'
         run: |
           # shellcheck disable=SC2129
-          echo "timeout-minutes=5" >> "$GITHUB_OUTPUT"
-          echo "step-timeout=10" >> "$GITHUB_OUTPUT"
+          echo "timeout-minutes=3" >> "$GITHUB_OUTPUT"
+          echo "step-timeout=5" >> "$GITHUB_OUTPUT"
 
   alloy-encode:
     needs:
