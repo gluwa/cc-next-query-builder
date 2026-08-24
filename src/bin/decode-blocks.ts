@@ -5,17 +5,28 @@ import { BaseContract, Contract, Wallet, WebSocketProvider } from 'ethers';
 import type { InterfaceAbi } from 'ethers';
 import { abiEncode } from '../encoding/abi';
 import { getTransactionWithRaw } from '../encoding';
-import { decoder } from '../utils';
+import { decoder, health, rateLimit } from '../utils';
 import EvmV1DecoderABI from '../utils/evmV1DecoderAbi.json';
 import { blockProver, proofProvider } from '../';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function getProofForTxn(apiUrl: string, chainKey: number, txn: string) {
+/**
+ * The reason a transaction's proof could not be fetched, when that reason is
+ * benign enough to skip the transaction instead of failing the run.
+ */
+type ProofSkipReason = 'EmptyBlockTxProof' | 'BlockNotReady' | 'BlockNotOnSourceChain';
+
+type ProofLookup =
+  | { response: proofProvider.ContinuityResponse; skipReason: null }
+  | { response: null; skipReason: ProofSkipReason };
+
+async function getProofForTxn(apiUrl: string, chainKey: number, txn: string): Promise<ProofLookup> {
   const url = `${apiUrl}/api/v1/proof-by-tx/${chainKey}/${txn}`;
   try {
     // NOTE: throws an exception in case of errors
-    return await axios.get(url);
+    const response = await rateLimit.withRateLimitRetry('proof-by-tx', () => axios.get(url));
+    return { response: response.data as proofProvider.ContinuityResponse, skipReason: null };
   } catch (error) {
     // The prover returns HTTP 422 with code 'EmptyBlockTxProof' for blocks
     // that contain no transactions; there is no tx proof to verify, so we
@@ -26,7 +37,7 @@ async function getProofForTxn(apiUrl: string, chainKey: number, txn: string) {
       error.response?.status === 422 &&
       (error.response?.data?.code === 'EmptyBlockTxProof' || error.response?.data?.code === 'BlockNotReady')
     ) {
-      return null;
+      return { response: null, skipReason: error.response.data.code as ProofSkipReason };
     }
 
     // usually means block is within the source chain's reorg-protection window and is not yet confirmed.
@@ -37,7 +48,7 @@ async function getProofForTxn(apiUrl: string, chainKey: number, txn: string) {
       error.response?.status === 404 &&
       error.response?.data?.code === 'BlockNotOnSourceChain'
     ) {
-      return null;
+      return { response: null, skipReason: 'BlockNotOnSourceChain' };
     }
 
     throw error;
@@ -50,7 +61,7 @@ async function decodeFromDisk(
   proverPrecompileWithSigner: BaseContract,
   proverBaseUrl: string,
   chainKey: number,
-) {
+): Promise<ProofSkipReason | null> {
   const verifyAndEmitSingleFragment =
     'verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
 
@@ -61,22 +72,29 @@ async function decodeFromDisk(
   await sleep(500); // rate-limit
 
   let gasForVerification = 0n;
-  const response = await getProofForTxn(proverBaseUrl, chainKey, txHash);
-  if (response !== null) {
-    const proofData = response.data as proofProvider.ContinuityResponse;
-
-    const estimate = await proverPrecompileWithSigner
-      .getFunction(verifyAndEmitSingleFragment)
-      .estimateGas(
-        proofData.chainKey,
-        proofData.headerNumber,
-        proofData.txBytes,
-        proofData.merkleProof,
-        proofData.continuityProof,
-      );
+  const { response: proofData, skipReason } = await getProofForTxn(proverBaseUrl, chainKey, txHash);
+  if (proofData !== null) {
+    const estimate = await rateLimit.withRateLimitRetry('verifyAndEmit estimateGas', () =>
+      proverPrecompileWithSigner
+        .getFunction(verifyAndEmitSingleFragment)
+        .estimateGas(
+          proofData.chainKey,
+          proofData.headerNumber,
+          proofData.txBytes,
+          proofData.merkleProof,
+          proofData.continuityProof,
+        ),
+    );
     gasForVerification = BigInt(estimate);
   }
-  console.log(`    ... gasForVerification=${gasForVerification} - 0 means skipped`);
+  // Always say *why* a verification was skipped. A silent `gasForVerification=0`
+  // hid a dead prover for days: every proof lookup was being skipped and the run
+  // still reported the gas check as passing.
+  console.log(
+    skipReason === null
+      ? `    ... gasForVerification=${gasForVerification}`
+      : `    ... gasForVerification skipped: prover returned ${skipReason}`,
+  );
 
   // Reject any single transaction whose individual gas cost crosses the
   // per-transaction cap. A single tx must fit comfortably within a block
@@ -94,9 +112,11 @@ async function decodeFromDisk(
     flag: 'r',
   }).trim();
 
-  const decoded = await decoder.decodeEvmV1Transaction(encodedData, decodeContract, {
-    trackGas: true,
-  });
+  const decoded = await rateLimit.withRateLimitRetry('decodeEvmV1Transaction', () =>
+    decoder.decodeEvmV1Transaction(encodedData, decodeContract, {
+      trackGas: true,
+    }),
+  );
   const gasForDecoding = decoded.gasUsed ?? BigInt(0);
   console.log(`     decoded as type ${decoded.type}, gasForDecoding=${gasForDecoding}`);
   if (gasForDecoding >= singleTxnGasLimit) {
@@ -124,7 +144,19 @@ async function decodeFromDisk(
       `totalGas ${totalGas} reaches or exceeds 70% of the ${blockGasLimit} block gas limit (${totalGasThreshold}); failing run`,
     );
   }
+
+  return skipReason;
 }
+
+/**
+ * Skipping the odd transaction is normal: blocks inside the source chain's
+ * reorg window, or without any transactions, have no proof to verify. Skipping
+ * (nearly) *everything* means the prover is broken and this workflow is only
+ * pretending to check verification gas, so fail once the skip rate stays this
+ * high over a sample big enough to be conclusive.
+ */
+const MAX_SKIP_RATE = 0.9;
+const MIN_SKIP_SAMPLE = 50;
 
 async function decodeBlocks(
   creditcoinUrl: string,
@@ -150,10 +182,32 @@ async function decodeBlocks(
     throw new Error('0 files found to decode. Something is wrong. Please investigate');
   }
 
+  const skipReasons = new Map<ProofSkipReason, number>();
+  let skipped = 0;
+
   for (const [idx, txFile] of txnFiles.entries()) {
     console.log(`>>>> ${idx}/${numFiles} decoding ${txFile}`);
-    await decodeFromDisk(txFile, decodeContract, proverPrecompileWithSigner, proverUrl, chainKey);
-    // await sleep(50); // rate-limit ourselves
+    const skipReason = await decodeFromDisk(txFile, decodeContract, proverPrecompileWithSigner, proverUrl, chainKey);
+
+    if (skipReason !== null) {
+      skipped += 1;
+      skipReasons.set(skipReason, (skipReasons.get(skipReason) ?? 0) + 1);
+    }
+
+    const attempted = idx + 1;
+    if (health.skipRateExceeded(skipped, attempted, MAX_SKIP_RATE, MIN_SKIP_SAMPLE)) {
+      const tally = [...skipReasons].map(([reason, count]) => `${reason}=${count}`).join(', ');
+      throw new Error(
+        `${skipped}/${attempted} proof lookups were skipped (${tally}); ` +
+          `verification gas is not being checked at all. The prover is likely unhealthy ` +
+          `— check ${proverUrl}/api/v1/health. Failing run`,
+      );
+    }
+  }
+
+  if (skipped > 0) {
+    const tally = [...skipReasons].map(([reason, count]) => `${reason}=${count}`).join(', ');
+    console.log(`INFO: skipped verification for ${skipped}/${numFiles} transactions (${tally})`);
   }
   console.log(`DONE`);
   process.exit(0);
