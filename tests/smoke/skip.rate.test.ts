@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { blockNumberFromPath, isExpectedProofSkip } from '../../src/bin/proof-skips';
+import { blockNumberFromPath, isExpectedProofSkip, sampleEvenly } from '../../src/bin/decode-policy';
 import { health } from '../../src/utils';
 
 const MAX_UNEXPECTED_SKIP_RATE = 0.9;
@@ -61,5 +61,30 @@ describe('skipRateExceeded', () => {
     // so nothing unexpected is counted and the run must not fail
     expect(exceeded(0, 50)).toBe(false);
     expect(exceeded(0, 21398)).toBe(false);
+  });
+});
+
+describe('sampleEvenly', () => {
+  test('keeps everything when the limit is not binding', () => {
+    expect(sampleEvenly(['a', 'b', 'c'], 5)).toEqual(['a', 'b', 'c']);
+    expect(sampleEvenly(['a', 'b', 'c'], 3)).toEqual(['a', 'b', 'c']);
+    expect(sampleEvenly(['a', 'b', 'c'], 0)).toEqual(['a', 'b', 'c']);
+    expect(sampleEvenly(['a', 'b', 'c'], -1)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('spreads the sample rather than taking a prefix', () => {
+    expect(sampleEvenly(['a', 'b', 'c', 'd'], 2)).toEqual(['a', 'c']);
+    expect(sampleEvenly([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)).toEqual([1, 3, 5, 7, 9]);
+  });
+
+  test('covers the whole run at the sizes CI actually sees', () => {
+    // the 5,142-transaction ethereum run, capped at 150
+    const files = Array.from({ length: 5142 }, (_, i) => i);
+    const sampled = sampleEvenly(files, 150);
+    expect(sampled).toHaveLength(150);
+    expect(sampled[0]).toBe(0);
+    // reaches into the last stride, i.e. the newest blocks are represented
+    expect(sampled[sampled.length - 1]).toBeGreaterThan(5142 - Math.ceil(5142 / 150) - 1);
+    expect(new Set(sampled).size).toBe(150);
   });
 });
