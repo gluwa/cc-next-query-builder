@@ -48,6 +48,17 @@ export function isRateLimitError(error: unknown): boolean {
   );
 }
 
+export interface RateLimitRetryOptions {
+  /** total attempts before giving up; delays double from 1s. Defaults to 7. */
+  numOfAttempts?: number;
+  /**
+   * Called every time rate limiting is observed. Retrying only helps with
+   * bursts — a caller that is *persistently* over quota should use this to slow
+   * its overall pace down, e.g. via an {@link AdaptivePacer}.
+   */
+  onRateLimited?: () => void;
+}
+
 /**
  * Runs `operation`, backing off and retrying for as long as the far end reports
  * rate limiting. Any other error is thrown on the first attempt.
@@ -57,7 +68,7 @@ export function isRateLimitError(error: unknown): boolean {
  *
  * @param label - name used in the retry log line, e.g. 'verifyAndEmit estimateGas'
  * @param operation - the call to run
- * @param numOfAttempts - total attempts before giving up; delays double from 1s
+ * @param opts - see {@link RateLimitRetryOptions}
  *
  * @example
  * ```ts
@@ -69,8 +80,9 @@ export function isRateLimitError(error: unknown): boolean {
 export async function withRateLimitRetry<T>(
   label: string,
   operation: () => Promise<T>,
-  numOfAttempts: number = 7,
+  opts: RateLimitRetryOptions = {},
 ): Promise<T> {
+  const { numOfAttempts = 7, onRateLimited } = opts;
   const backOffOptions = {
     delayFirstAttempt: false,
     jitter: 'full',
@@ -81,10 +93,73 @@ export async function withRateLimitRetry<T>(
       if (!isRateLimitError(error)) {
         return false;
       }
+      onRateLimited?.();
       console.warn(`    ... rate limited on ${label}; retrying (attempt ${attempt})`);
       return true;
     },
   } as BackoffOptions;
 
   return backOff(operation, backOffOptions);
+}
+
+/**
+ * Paces a loop of RPC calls, slowing down whenever the far end reports rate
+ * limiting and never speeding back up.
+ *
+ * Retrying an individual call only rescues a burst. When a loop is
+ * *persistently* asking for more than its quota — as `decode-blocks` is, at six
+ * RPC requests per transaction — the only thing that helps is issuing fewer
+ * requests per second, and the quota is not published anywhere, so the pace has
+ * to be discovered by running into it.
+ *
+ * @example
+ * ```ts
+ * const pacer = new AdaptivePacer(500, 5000);
+ * for (const item of items) {
+ *   await pacer.wait();
+ *   await withRateLimitRetry('call', () => rpcCall(item), { onRateLimited: () => pacer.slowDown() });
+ * }
+ * ```
+ */
+export class AdaptivePacer {
+  private delayMs: number;
+
+  /**
+   * @param startingDelayMs - initial delay between iterations
+   * @param maxDelayMs - delay ceiling, so a badly throttled run still finishes
+   * @param factor - how sharply to back off on each rate limit observed
+   */
+  constructor(
+    startingDelayMs: number,
+    private readonly maxDelayMs: number,
+    private readonly factor: number = 1.5,
+  ) {
+    this.delayMs = startingDelayMs;
+  }
+
+  /** The delay currently applied between iterations. */
+  public get currentDelayMs(): number {
+    return this.delayMs;
+  }
+
+  /** Waits out the current delay. */
+  public async wait(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+  }
+
+  /**
+   * Widens the delay after observing rate limiting, up to the ceiling.
+   *
+   * @returns the new delay, so callers can log the change
+   */
+  public slowDown(): number {
+    const widened = Math.min(Math.round(this.delayMs * this.factor), this.maxDelayMs);
+    const changed = widened !== this.delayMs;
+    this.delayMs = widened;
+    if (changed) {
+      console.warn(`    ... pacing back to one transaction every ${this.delayMs}ms`);
+    }
+
+    return this.delayMs;
+  }
 }

@@ -67,7 +67,7 @@ describe('withRateLimitRetry', () => {
       .mockResolvedValue(860207n);
 
     // 3 attempts keeps the backoff (1s + 2s worst case) inside the test timeout
-    await expect(rateLimit.withRateLimitRetry('estimateGas', operation, 3)).resolves.toBe(860207n);
+    await expect(rateLimit.withRateLimitRetry('estimateGas', operation, { numOfAttempts: 3 })).resolves.toBe(860207n);
     expect(operation).toHaveBeenCalledTimes(3);
   });
 
@@ -75,7 +75,9 @@ describe('withRateLimitRetry', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     const operation = jest.fn<() => Promise<bigint>>().mockRejectedValue(throttledEstimateGasError());
 
-    await expect(rateLimit.withRateLimitRetry('estimateGas', operation, 2)).rejects.toThrow('missing revert data');
+    await expect(rateLimit.withRateLimitRetry('estimateGas', operation, { numOfAttempts: 2 })).rejects.toThrow(
+      'missing revert data',
+    );
     expect(operation).toHaveBeenCalledTimes(2);
   });
 
@@ -84,5 +86,45 @@ describe('withRateLimitRetry', () => {
 
     await expect(rateLimit.withRateLimitRetry('estimateGas', operation)).rejects.toThrow('execution reverted');
     expect(operation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AdaptivePacer', () => {
+  test('widens the gap each time throttling is seen, up to the ceiling', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const pacer = new rateLimit.AdaptivePacer(500, 2000);
+
+    expect(pacer.currentDelayMs).toBe(500);
+    expect(pacer.slowDown()).toBe(750);
+    expect(pacer.slowDown()).toBe(1125);
+    expect(pacer.slowDown()).toBe(1688);
+    expect(pacer.slowDown()).toBe(2000);
+    // pinned at the ceiling, so a throttled run still finishes
+    expect(pacer.slowDown()).toBe(2000);
+  });
+
+  test('withRateLimitRetry reports throttling to the pacer', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const pacer = new rateLimit.AdaptivePacer(500, 5000);
+    const operation = jest
+      .fn<() => Promise<bigint>>()
+      .mockRejectedValueOnce(throttledEstimateGasError())
+      .mockResolvedValue(1n);
+
+    await rateLimit.withRateLimitRetry('estimateGas', operation, {
+      numOfAttempts: 2,
+      onRateLimited: () => pacer.slowDown(),
+    });
+
+    expect(pacer.currentDelayMs).toBe(750);
+  });
+
+  test('waits out the current delay', async () => {
+    const pacer = new rateLimit.AdaptivePacer(60, 60);
+    const startedAt = process.hrtime.bigint();
+    await pacer.wait();
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+    expect(elapsedMs).toBeGreaterThanOrEqual(50);
   });
 });

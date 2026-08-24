@@ -8,19 +8,24 @@ import { getTransactionWithRaw } from '../encoding';
 import { decoder, health, rateLimit } from '../utils';
 import EvmV1DecoderABI from '../utils/evmV1DecoderAbi.json';
 import { blockProver, chainInfo, proofProvider } from '../';
-import { blockNumberFromPath, isExpectedProofSkip, ProofSkipReason } from './proof-skips';
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { blockNumberFromPath, isExpectedProofSkip, ProofSkipReason, sampleEvenly } from './decode-policy';
 
 type ProofLookup =
   | { response: proofProvider.ContinuityResponse; skipReason: null }
   | { response: null; skipReason: ProofSkipReason };
 
-async function getProofForTxn(apiUrl: string, chainKey: number, txn: string): Promise<ProofLookup> {
+async function getProofForTxn(
+  apiUrl: string,
+  chainKey: number,
+  txn: string,
+  pacer: rateLimit.AdaptivePacer,
+): Promise<ProofLookup> {
   const url = `${apiUrl}/api/v1/proof-by-tx/${chainKey}/${txn}`;
   try {
     // NOTE: throws an exception in case of errors
-    const response = await rateLimit.withRateLimitRetry('proof-by-tx', () => axios.get(url));
+    const response = await rateLimit.withRateLimitRetry('proof-by-tx', () => axios.get(url), {
+      onRateLimited: () => pacer.slowDown(),
+    });
     return { response: response.data as proofProvider.ContinuityResponse, skipReason: null };
   } catch (error) {
     // The prover returns HTTP 422 with code 'EmptyBlockTxProof' for blocks
@@ -56,6 +61,7 @@ async function decodeFromDisk(
   proverPrecompileWithSigner: BaseContract,
   proverBaseUrl: string,
   chainKey: number,
+  pacer: rateLimit.AdaptivePacer,
 ): Promise<ProofSkipReason | null> {
   const verifyAndEmitSingleFragment =
     'verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))';
@@ -64,21 +70,24 @@ async function decodeFromDisk(
   const txHash = pathComponents[pathComponents.length - 1];
 
   console.log(`... get proof for source txn ${txHash}`);
-  await sleep(500); // rate-limit
+  await pacer.wait(); // rate-limit
 
   let gasForVerification = 0n;
-  const { response: proofData, skipReason } = await getProofForTxn(proverBaseUrl, chainKey, txHash);
+  const { response: proofData, skipReason } = await getProofForTxn(proverBaseUrl, chainKey, txHash, pacer);
   if (proofData !== null) {
-    const estimate = await rateLimit.withRateLimitRetry('verifyAndEmit estimateGas', () =>
-      proverPrecompileWithSigner
-        .getFunction(verifyAndEmitSingleFragment)
-        .estimateGas(
-          proofData.chainKey,
-          proofData.headerNumber,
-          proofData.txBytes,
-          proofData.merkleProof,
-          proofData.continuityProof,
-        ),
+    const estimate = await rateLimit.withRateLimitRetry(
+      'verifyAndEmit estimateGas',
+      () =>
+        proverPrecompileWithSigner
+          .getFunction(verifyAndEmitSingleFragment)
+          .estimateGas(
+            proofData.chainKey,
+            proofData.headerNumber,
+            proofData.txBytes,
+            proofData.merkleProof,
+            proofData.continuityProof,
+          ),
+      { onRateLimited: () => pacer.slowDown() },
     );
     gasForVerification = BigInt(estimate);
   }
@@ -107,10 +116,13 @@ async function decodeFromDisk(
     flag: 'r',
   }).trim();
 
-  const decoded = await rateLimit.withRateLimitRetry('decodeEvmV1Transaction', () =>
-    decoder.decodeEvmV1Transaction(encodedData, decodeContract, {
-      trackGas: true,
-    }),
+  const decoded = await rateLimit.withRateLimitRetry(
+    'decodeEvmV1Transaction',
+    () =>
+      decoder.decodeEvmV1Transaction(encodedData, decodeContract, {
+        trackGas: true,
+      }),
+    { onRateLimited: () => pacer.slowDown() },
   );
   const gasForDecoding = decoded.gasUsed ?? BigInt(0);
   console.log(`     decoded as type ${decoded.type}, gasForDecoding=${gasForDecoding}`);
@@ -161,12 +173,25 @@ const MIN_SKIP_SAMPLE = 50;
  */
 const ATTESTED_HEIGHT_TTL_MS = 60_000;
 
+/**
+ * Pacing bounds, in milliseconds, for the gap between transactions. Each
+ * transaction costs about six RPC requests (three decoder calls, each paired
+ * with an `estimateGas` by `trackGas`), and the devnet gateway's quota sits
+ * below what that adds up to at the old fixed 500ms — so the gap starts there
+ * and widens on its own whenever throttling shows up. Together with the
+ * transaction cap the ceiling bounds the runtime: at the widest pace, 150
+ * transactions take about six minutes.
+ */
+const STARTING_PACE_MS = 500;
+const MAX_PACE_MS = 2_500;
+
 async function decodeBlocks(
   creditcoinUrl: string,
   proverUrl: string,
   decoderLibraryAddress: string,
   pathToStore: string,
   chainKey: number,
+  maxTransactions: number,
 ): Promise<void> {
   const creditcoinWs = new WebSocketProvider(creditcoinUrl);
   const decodeContract = new Contract(decoderLibraryAddress, EvmV1DecoderABI as InterfaceAbi, creditcoinWs);
@@ -176,14 +201,26 @@ async function decodeBlocks(
     Wallet.createRandom().connect(creditcoinWs),
   );
 
-  const txnFiles = await glob('*/**.txt', { cwd: pathToStore, absolute: true });
-  txnFiles.sort();
-  const numFiles = txnFiles.length;
-  console.log(`INFO: found ${numFiles} transactions to decode`);
+  const encodedFiles = await glob('*/**.txt', { cwd: pathToStore, absolute: true });
+  encodedFiles.sort();
+  console.log(`INFO: found ${encodedFiles.length} transactions to decode`);
 
-  if (numFiles === 0) {
+  if (encodedFiles.length === 0) {
     throw new Error('0 files found to decode. Something is wrong. Please investigate');
   }
+
+  // Decoding every encoded transaction is what pushes this job over the RPC
+  // quota: the encode step happily produces thousands of them, and at six
+  // requests each there is no pace that gets through them all in CI. Sample
+  // instead, spread across every block encoded, so each run checks a bounded
+  // slice and consecutive runs cover different transactions.
+  const txnFiles = sampleEvenly(encodedFiles, maxTransactions);
+  const numFiles = txnFiles.length;
+  if (numFiles < encodedFiles.length) {
+    console.log(`INFO: decoding a sample of ${numFiles} of them, spread across all encoded blocks`);
+  }
+
+  const pacer = new rateLimit.AdaptivePacer(STARTING_PACE_MS, MAX_PACE_MS);
 
   // read lazily (only when something is skipped) and cached, so classifying
   // skips costs one RPC call a minute rather than one per transaction
@@ -195,8 +232,10 @@ async function decodeBlocks(
     }
 
     try {
-      const heightHash = await rateLimit.withRateLimitRetry('latest attested height', () =>
-        chainInfoProvider.getLatestAttestedHeightAndHash(chainKey),
+      const heightHash = await rateLimit.withRateLimitRetry(
+        'latest attested height',
+        () => chainInfoProvider.getLatestAttestedHeightAndHash(chainKey),
+        { onRateLimited: () => pacer.slowDown() },
       );
       attestedHeight = { value: heightHash.exists ? heightHash.height : null, readAt: Date.now() };
     } catch (error) {
@@ -215,7 +254,14 @@ async function decodeBlocks(
 
   for (const [idx, txFile] of txnFiles.entries()) {
     console.log(`>>>> ${idx}/${numFiles} decoding ${txFile}`);
-    const skipReason = await decodeFromDisk(txFile, decodeContract, proverPrecompileWithSigner, proverUrl, chainKey);
+    const skipReason = await decodeFromDisk(
+      txFile,
+      decodeContract,
+      proverPrecompileWithSigner,
+      proverUrl,
+      chainKey,
+      pacer,
+    );
 
     if (skipReason !== null) {
       skipReasons.set(skipReason, (skipReasons.get(skipReason) ?? 0) + 1);
@@ -262,12 +308,14 @@ async function decodeBlocks(
         `(or wait for attestation) if this run is meant to exercise verifyAndEmit.`,
     );
   }
-  console.log(`DONE`);
+  console.log(`DONE (final pace: one transaction every ${pacer.currentDelayMs}ms)`);
   process.exit(0);
 }
 
 if (process.argv.length < 5) {
-  console.error('node dist/bin/decode-blocks.js <ws://creditcoinRpcUrl> <evmV1DecoderAddress> <pathToStore>');
+  console.error(
+    'node dist/bin/decode-blocks.js <ws://creditcoinRpcUrl> <proverUrl> <evmV1DecoderAddress> <pathToStore> <chainKey> [maxTransactions]',
+  );
   process.exit(1);
 }
 
@@ -276,8 +324,10 @@ const proverUrl = process.argv[3];
 const evmV1DecoderAddress = process.argv[4];
 const pathToStore = process.argv[5];
 const chainKey = parseInt(process.argv[6]);
+// optional: 0 (the default) decodes everything, which is only viable off CI
+const maxTransactions = parseInt(process.argv[7]) || 0;
 
-decodeBlocks(rpcUrl, proverUrl, evmV1DecoderAddress, pathToStore, chainKey).catch((reason) => {
+decodeBlocks(rpcUrl, proverUrl, evmV1DecoderAddress, pathToStore, chainKey, maxTransactions).catch((reason) => {
   console.error(reason);
   process.exit(1);
 });

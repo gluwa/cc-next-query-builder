@@ -262,13 +262,17 @@ jobs:
           pattern: encoded-by-ethers
 
       - name: Decode transactions
+        # the script paces itself against the RPC quota, so bound the step in
+        # case it ends up crawling at the widest pace
+        timeout-minutes: 10
         run: |
           node dist/bin/decode-blocks.js \
             wss://rpc.cc3-devnet.creditcoin.network \
             https://prover.cc3-devnet.creditcoin.network \
             0xf882f3a71A36E29E86615B7055f42A68D7E4cfBB \
             /var/tmp/encoded-data/ \
-            4
+            4 \
+            150
 
       - name: Report result to Slack
         if: always()

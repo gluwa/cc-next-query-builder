@@ -69,3 +69,30 @@ export function isExpectedProofSkip(
 
   return blockNumber > attestedHeight;
 }
+
+/**
+ * Picks at most `limit` items, spread evenly across `items` rather than taken
+ * from the front, so a capped run still samples every block it encoded instead
+ * of exhausting itself on the oldest one.
+ *
+ * @param items - the full, sorted work list
+ * @param limit - maximum items to keep; `0` or less keeps everything
+ *
+ * @example
+ * ```ts
+ * sampleEvenly(['a', 'b', 'c', 'd'], 2); // ['a', 'c']
+ * ```
+ */
+export function sampleEvenly<T>(items: T[], limit: number): T[] {
+  if (limit <= 0 || items.length <= limit) {
+    return items;
+  }
+
+  const stride = items.length / limit;
+  const sampled: T[] = [];
+  for (let i = 0; i < limit; i += 1) {
+    sampled.push(items[Math.floor(i * stride)]);
+  }
+
+  return sampled;
+}
