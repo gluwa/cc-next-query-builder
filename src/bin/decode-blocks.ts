@@ -7,15 +7,10 @@ import { abiEncode } from '../encoding/abi';
 import { getTransactionWithRaw } from '../encoding';
 import { decoder, health, rateLimit } from '../utils';
 import EvmV1DecoderABI from '../utils/evmV1DecoderAbi.json';
-import { blockProver, proofProvider } from '../';
+import { blockProver, chainInfo, proofProvider } from '../';
+import { blockNumberFromPath, isExpectedProofSkip, ProofSkipReason } from './proof-skips';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * The reason a transaction's proof could not be fetched, when that reason is
- * benign enough to skip the transaction instead of failing the run.
- */
-type ProofSkipReason = 'EmptyBlockTxProof' | 'BlockNotReady' | 'BlockNotOnSourceChain';
 
 type ProofLookup =
   | { response: proofProvider.ContinuityResponse; skipReason: null }
@@ -149,14 +144,22 @@ async function decodeFromDisk(
 }
 
 /**
- * Skipping the odd transaction is normal: blocks inside the source chain's
- * reorg window, or without any transactions, have no proof to verify. Skipping
- * (nearly) *everything* means the prover is broken and this workflow is only
- * pretending to check verification gas, so fail once the skip rate stays this
- * high over a sample big enough to be conclusive.
+ * Blocks newer than the latest attestation have no proof yet, and this workflow
+ * deliberately encodes the newest blocks it can find, so most skips are
+ * expected — see {@link isExpectedProofSkip}. Skipping proofs for blocks that
+ * *are* attested is the symptom worth failing on: the proof should exist, so
+ * the prover is not doing its job and the verification-gas check is only
+ * pretending to run. Fail once that rate stays high over a conclusive sample.
  */
-const MAX_SKIP_RATE = 0.9;
+const MAX_UNEXPECTED_SKIP_RATE = 0.9;
 const MIN_SKIP_SAMPLE = 50;
+
+/**
+ * How long a read of the attested height stays usable. Attestation only moves
+ * forward, so a stale (lower) height merely classifies borderline skips as
+ * expected — the safe direction to err in.
+ */
+const ATTESTED_HEIGHT_TTL_MS = 60_000;
 
 async function decodeBlocks(
   creditcoinUrl: string,
@@ -182,32 +185,82 @@ async function decodeBlocks(
     throw new Error('0 files found to decode. Something is wrong. Please investigate');
   }
 
+  // read lazily (only when something is skipped) and cached, so classifying
+  // skips costs one RPC call a minute rather than one per transaction
+  const chainInfoProvider = new chainInfo.PrecompileChainInfoProvider(creditcoinWs);
+  let attestedHeight: { value: number | null; readAt: number } | null = null;
+  const readAttestedHeight = async (): Promise<number | null> => {
+    if (attestedHeight !== null && Date.now() - attestedHeight.readAt < ATTESTED_HEIGHT_TTL_MS) {
+      return attestedHeight.value;
+    }
+
+    try {
+      const heightHash = await rateLimit.withRateLimitRetry('latest attested height', () =>
+        chainInfoProvider.getLatestAttestedHeightAndHash(chainKey),
+      );
+      attestedHeight = { value: heightHash.exists ? heightHash.height : null, readAt: Date.now() };
+    } catch (error) {
+      // not being able to read the height is not a reason to fail the run; it
+      // only means skips cannot be classified for the next minute
+      console.warn(`    ... could not read the latest attested height: ${error}`);
+      attestedHeight = { value: null, readAt: Date.now() };
+    }
+
+    return attestedHeight.value;
+  };
+
   const skipReasons = new Map<ProofSkipReason, number>();
-  let skipped = 0;
+  let expectedSkips = 0;
+  let unexpectedSkips = 0;
 
   for (const [idx, txFile] of txnFiles.entries()) {
     console.log(`>>>> ${idx}/${numFiles} decoding ${txFile}`);
     const skipReason = await decodeFromDisk(txFile, decodeContract, proverPrecompileWithSigner, proverUrl, chainKey);
 
     if (skipReason !== null) {
-      skipped += 1;
       skipReasons.set(skipReason, (skipReasons.get(skipReason) ?? 0) + 1);
+
+      const blockNumber = blockNumberFromPath(txFile);
+      const latestAttested = await readAttestedHeight();
+      if (isExpectedProofSkip(skipReason, blockNumber, latestAttested)) {
+        expectedSkips += 1;
+      } else {
+        unexpectedSkips += 1;
+        console.warn(
+          `    ... block ${blockNumber} is attested (latest attested height is ${latestAttested}) but the prover returned ${skipReason}`,
+        );
+      }
     }
 
     const attempted = idx + 1;
-    if (health.skipRateExceeded(skipped, attempted, MAX_SKIP_RATE, MIN_SKIP_SAMPLE)) {
+    if (health.skipRateExceeded(unexpectedSkips, attempted, MAX_UNEXPECTED_SKIP_RATE, MIN_SKIP_SAMPLE)) {
       const tally = [...skipReasons].map(([reason, count]) => `${reason}=${count}`).join(', ');
       throw new Error(
-        `${skipped}/${attempted} proof lookups were skipped (${tally}); ` +
+        `${unexpectedSkips}/${attempted} proof lookups were skipped for blocks that are already attested (${tally}); ` +
           `verification gas is not being checked at all. The prover is likely unhealthy ` +
           `— check ${proverUrl}/api/v1/health. Failing run`,
       );
     }
   }
 
+  const skipped = expectedSkips + unexpectedSkips;
   if (skipped > 0) {
     const tally = [...skipReasons].map(([reason, count]) => `${reason}=${count}`).join(', ');
-    console.log(`INFO: skipped verification for ${skipped}/${numFiles} transactions (${tally})`);
+    console.log(
+      `INFO: skipped verification for ${skipped}/${numFiles} transactions ` +
+        `(${tally}; ${unexpectedSkips} of them for blocks that were already attested)`,
+    );
+  }
+  // Losing the verification-gas check entirely is not a script failure, but it
+  // does mean this run only measured decoding. It happens when every block
+  // encoded is newer than the latest attestation, i.e. the encode window is
+  // shorter than the time attestation lags the source chain.
+  if (skipped === numFiles) {
+    console.warn(
+      `WARNING: verification gas was never measured — all ${numFiles} transactions were skipped. ` +
+        `Every encoded block is newer than the latest attested height, so encode a longer window ` +
+        `(or wait for attestation) if this run is meant to exercise verifyAndEmit.`,
+    );
   }
   console.log(`DONE`);
   process.exit(0);
